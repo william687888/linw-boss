@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天堂W王團秘書</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database-compat.js"></script>
+    <style>
+        body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
+        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; height: 100%; transition: 0.5s; }
+        .boss-name { font-size: 1.05rem; font-weight: bold; color: #ffca2c; }
+        .countdown { font-size: 1.3rem; font-family: 'Segoe UI', monospace; color: #00ff00; font-weight: bold; }
+        .warning { background-color: #4a0000 !important; border-color: #ff0000; animation: blinker 1.5s linear infinite; }
+        .off-day { opacity: 0.3; filter: grayscale(1); }
+        @keyframes blinker { 50% { opacity: 0.7; } }
+        .btn-gold { background-color: #ffca2c; color: #000; font-weight: bold; border: none; }
+        .badge-fixed { background-color: #0d6efd; padding: 4px 8px; font-size: 0.75rem; }
+        .badge-cd { background-color: #6c757d; padding: 4px 8px; font-size: 0.75rem; }
+        .alias-text { font-size: 0.75rem; color: #888; margin-bottom: 5px; }
+        .info-row { border-top: 1px solid #333; margin-top: auto; padding-top: 8px; }
+        .label-text { font-size: 0.75rem; color: #aaa; }
+        #syncStatus.sync-flash { animation: flash 0.5s ease; }
+        @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.3; background-color: #ffca2c; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="container py-4">
+    <h3 class="text-center mb-4">🛡️ 天堂W王團秘書</h3>
+    
+    <div class="card p-3 mb-4 shadow">
+        <div class="input-group">
+            <input type="text" id="cmd" class="form-control" placeholder="輸入: 1930巨鱷 或 管理指令">
+            <button class="btn btn-gold" onclick="handleCommand()">執行</button>
+        </div>
+        <div class="mt-2 text-center">
+            <button class="btn btn-outline-warning btn-sm m-1" onclick="handleCommand('CD減半')">⚡ CD減半</button>
+            <button class="btn btn-outline-secondary btn-sm m-1" onclick="handleCommand('CD恢復')">🔄 CD恢復</button>
+            <span id="syncStatus" class="badge bg-secondary ms-2">連線中...</span>
+        </div>
+    </div>
+
+    <div id="bossContainer" class="row g-2"></div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAiPLZv4zBUDG3z2zQSnlt31K-IOoLW-Gs",
+  authDomain: "mybosstimer.firebaseapp.com",
+  databaseURL: "https://mybosstimer-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "mybosstimer",
+  storageBucket: "mybosstimer.firebasestorage.app",
+  messagingSenderId: "43002364713",
+  appId: "1:43002364713:web:8a19b0c5eb5eae4d3b6d38",
+  measurementId: "G-NQW3C870WF"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const dataRef = db.ref('bossData/SECRETARY_PRO_DATA'); 
+
+let bosses = [];
+let isFirstLoad = true;
+
+dataRef.on('value', (snapshot) => {
+    const data = snapshot.val();
+    const initialList = getInitialData();
+    if (!data || data.length < 5) { 
+        if (isFirstLoad) { bosses = initialList; saveToCloud(); }
+    } else { bosses = data; }
+    updateStatus("秘書同步中", "bg-success");
+    render();
+    isFirstLoad = false;
+});
+
+function handleCommand(manual) {
+    const input = (manual || document.getElementById('cmd').value).trim();
+    document.getElementById('cmd').value = '';
+    if(!input) return;
+    let needUpdate = false;
+    if (input === "CD減半") {
+        bosses.forEach(b => { if(b.type === 'cd') { b.cd = b.origCd / 2; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); } });
+        needUpdate = true;
+    } else if (input === "CD恢復") {
+        bosses.forEach(b => { if(b.type === 'cd') { b.cd = b.origCd; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); } });
+        needUpdate = true;
+    } else if (input.startsWith("新增") || input.startsWith("修改")) {
+        const p = input.split(",");
+        if(p.length >= 3) {
+            const name = p[1], cd = parseFloat(p[2]), alias = p[3] || "";
+            const idx = bosses.findIndex(b => b.name === name);
+            if(idx > -1) bosses[idx] = { ...bosses[idx], cd, origCd: cd, alias };
+            else bosses.push({ name, type: "cd", cd, origCd: cd, alias, spawn: null, lastDeath: null });
+            needUpdate = true;
+        }
+    } else if (input.startsWith("刪除")) {
+        const name = input.split(",")[1];
+        bosses = bosses.filter(b => b.name !== name);
+        needUpdate = true;
+    } else if (input.match(/^\d{4}/)) {
+        const tStr = input.substring(0,4), alias = input.substring(4);
+        const b = bosses.find(x => x.name.includes(alias) || x.alias.includes(alias));
+        if(b && b.type==='cd') {
+            let d = new Date(); d.setHours(tStr.substring(0,2), tStr.substring(2,4), 0, 0);
+            if(d > new Date()) d.setDate(d.getDate()-1);
+            b.lastDeath = d.getTime(); b.spawn = b.lastDeath + (b.cd * 3600000);
+            needUpdate = true;
+        }
+    }
+    if(needUpdate) { flashStatus(); saveToCloud(); }
+}
+
+function saveToCloud() { dataRef.set(bosses); }
+function updateStatus(text, className) { const s = document.getElementById('syncStatus'); s.innerText = text; s.className = "badge ms-2 " + className; }
+function flashStatus() { const s = document.getElementById('syncStatus'); s.classList.add('sync-flash'); setTimeout(() => s.classList.remove('sync-flash'), 500); }
+
+function getInitialData() {
+    return [
+        { name: "阿勒尼亞", type: "fixed", times: ["17:30"], alias: "蜘蛛" },
+        { name: "克特", type: "fixed", times: ["18:00"], alias: "克特" },
+        { name: "巫師", type: "fixed", times: ["18:20"], alias: "巫師" },
+        { name: "阿爾斯卡利亞", type: "fixed", times: ["18:40"], alias: "變怪" },
+        { name: "黑色亡靈萊奧斯", type: "fixed", times: ["19:00"], alias: "亞三" },
+        { name: "萊茵哈德", type: "fixed", times: ["01:00","03:00","05:00","07:00","09:00","11:00","13:00","15:00","17:00","19:00","21:00","23:00"], alias: "話2" },
+        { name: "鑽石高崙", type: "fixed", weekday: 1, times: ["19:00"], alias: "鑽高" },
+        { name: "船長卡利索", type: "fixed", weekday: 2, times: ["19:00"], alias: "船長" },
+        { name: "狂風的夏斯奇", type: "fixed", weekday: 3, times: ["19:00"], alias: "夏斯奇" },
+        { name: "疾風的巨大飛龍", type: "fixed", weekday: 4, times: ["19:00"], alias: "巨飛" },
+        { name: "黑虎恰姆帕瓦特", type: "cd", cd: 4, origCd: 4, alias: "黑虎,老虎", spawn: null, lastDeath: null },
+        { name: "尼羅德", type: "cd", cd: 4, origCd: 4, alias: "野豬", spawn: null, lastDeath: null },
+        { name: "茉莉提亞", type: "cd", cd: 4, origCd: 4, alias: "小茉", spawn: null, lastDeath: null },
+        { name: "黑蛇騎士團麥肯", type: "cd", cd: 4, origCd: 4, alias: "麥肯", spawn: null, lastDeath: null },
+        { name: "史前巨鱷", type: "cd", cd: 8, origCd: 8, alias: "巨鱷,鱷魚", spawn: null, lastDeath: null },
+        { name: "奈克偌斯", type: "cd", cd: 8, origCd: 8, alias: "奈克,阿吐巴", spawn: null, lastDeath: null },
+        { name: "烏勒庫斯", type: "cd", cd: 8, origCd: 8, alias: "烏勒", spawn: null, lastDeath: null },
+        { name: "審判者拉馬修", type: "cd", cd: 8, origCd: 8, alias: "拉馬修,蛇女", spawn: null, lastDeath: null },
+        { name: "庫爾托", type: "cd", cd: 8, origCd: 8, alias: "狼王,狼人", spawn: null, lastDeath: null },
+        { name: "巨人", type: "cd", cd: 12, origCd: 12, alias: "巨人王", spawn: null, lastDeath: null }
+    ];
+}
+
+function render() {
+    const container = document.getElementById('bossContainer');
+    container.innerHTML = '';
+    const now = new Date();
+    const today = now.getDay() === 0 ? 7 : now.getDay();
+    const weekMap = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
+
+    let sorted = bosses.map(b => {
+        let sortTime = 9999999999999, isOffDay = false, displayTime = "未記錄", countdownText = "下次重生：", isWarn = false;
+        
+        if(b.type === 'fixed') {
+            if(b.weekday && b.weekday !== today) {
+                isOffDay = true;
+                displayTime = `週(${b.weekday}) ${b.times[0]}`;
+                // 排序權重：非今天王 = 基礎大權重 + 週序(100萬級) + 時間
+                sortTime = 2000000000000 + (b.weekday * 100000000); 
+            } else {
+                let found = false;
+                for(let t of b.times) {
+                    let target = new Date(); target.setHours(t.split(':')[0], t.split(':')[1], 0, 0);
+                    if((target - now) / 60000 > -5) { sortTime = target.getTime(); displayTime = t; if((target - now) / 60000 <= 5) isWarn = true; found = true; break; }
+                }
+                if(!found) { displayTime = "今日已結束"; isOffDay = true; sortTime = 3000000000000; }
+            }
+        } else if (b.spawn) {
+            sortTime = b.spawn;
+            let diff = (b.spawn - now.getTime()) / 60000;
+            let sDate = new Date(b.spawn);
+            displayTime = sDate.getHours().toString().padStart(2,'0') + ":" + sDate.getMinutes().toString().padStart(2,'0');
+            if(diff <= 5 && diff > 0) isWarn = true;
+            countdownText = diff <= 0 ? "已重生！" : `剩餘 ${Math.floor(diff/60)}時${Math.floor(diff%60)}分`;
+        }
+        return { ...b, sortTime, isOffDay, displayTime, countdownText, isWarn };
+    });
+
+    sorted.sort((a, b) => a.sortTime - b.sortTime);
+
+    sorted.forEach(b => {
+        let label = "固定";
+        if(b.type === 'fixed' && b.weekday) label = `固定(${weekMap[b.weekday]})`;
+        else if(b.type === 'cd') label = `CD ${b.cd}h`;
+
+        container.innerHTML += `
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="boss-name text-truncate">${b.name}</div>
+                        <span class="badge ${b.type==='fixed'?'badge-fixed':'badge-cd'}">${label}</span>
+                    </div>
+                    <div class="alias-text text-truncate">${b.alias}</div>
+                    <div class="info-row">
+                        <div class="label-text">${b.countdownText}</div>
+                        <div class="countdown">${b.displayTime}</div>
+                    </div>
+                </div>
+            </div>`;
+    });
+}
+setInterval(render, 10000); 
+render();
+</script>
+</body>
+</html>
