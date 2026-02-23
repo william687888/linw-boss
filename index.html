@@ -10,7 +10,14 @@
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
         .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; height: 100%; transition: 0.5s; }
-        .boss-name { font-size: 1.05rem; font-weight: bold; color: #ffca2c; }
+        .boss-name { font-size: 1.05rem; font-weight: bold; }
+        
+        /* 顏色分級修正 */
+        .color-default { color: #ffca2c; } 
+        .color-purple { color: #bf40ff; }  /* 紫色：週王、CD12H */
+        .color-red { color: #ff4d4d; }     /* 紅色：CD8H */
+        .color-blue { color: #4da6ff; }    /* 藍色：CD4H */
+
         .countdown { font-size: 1.3rem; font-family: 'Segoe UI', monospace; color: #00ff00; font-weight: bold; }
         .warning { background-color: #4a0000 !important; border-color: #ff0000; animation: blinker 1.5s linear infinite; }
         .off-day { opacity: 0.3; filter: grayscale(1); }
@@ -32,7 +39,7 @@
     
     <div class="card p-3 mb-4 shadow">
         <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="輸入: 1930巨鱷 或 管理指令">
+            <input type="text" id="cmd" class="form-control" placeholder="1930巨鱷 或 2220老虎">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
         <div class="mt-2 text-center">
@@ -41,7 +48,6 @@
             <span id="syncStatus" class="badge bg-secondary ms-2">連線中...</span>
         </div>
     </div>
-
     <div id="bossContainer" class="row g-2"></div>
 </div>
 
@@ -66,9 +72,8 @@ let isFirstLoad = true;
 
 dataRef.on('value', (snapshot) => {
     const data = snapshot.val();
-    const initialList = getInitialData();
     if (!data || data.length < 5) { 
-        if (isFirstLoad) { bosses = initialList; saveToCloud(); }
+        if (isFirstLoad) { bosses = getInitialData(); saveToCloud(); }
     } else { bosses = data; }
     updateStatus("秘書同步中", "bg-success");
     render();
@@ -150,12 +155,10 @@ function render() {
 
     let sorted = bosses.map(b => {
         let sortTime = 9999999999999, isOffDay = false, displayTime = "未記錄", countdownText = "下次重生：", isWarn = false;
-        
         if(b.type === 'fixed') {
             if(b.weekday && b.weekday !== today) {
                 isOffDay = true;
                 displayTime = `週(${b.weekday}) ${b.times[0]}`;
-                // 排序權重：非今天王 = 基礎大權重 + 週序(100萬級) + 時間
                 sortTime = 2000000000000 + (b.weekday * 100000000); 
             } else {
                 let found = false;
@@ -180,14 +183,29 @@ function render() {
 
     sorted.forEach(b => {
         let label = "固定";
-        if(b.type === 'fixed' && b.weekday) label = `固定(${weekMap[b.weekday]})`;
-        else if(b.type === 'cd') label = `CD ${b.cd}h`;
+        let colorClass = "color-default";
+
+        if (b.type === 'fixed') {
+            if (b.weekday) {
+                label = `固定(${weekMap[b.weekday]})`;
+                colorClass = "color-purple";
+            }
+        } else if (b.type === 'cd') {
+            label = `CD ${b.cd}h`;
+            if (b.origCd >= 12) {
+                colorClass = "color-purple"; // 12H 紫色
+            } else if (b.origCd >= 8) {
+                colorClass = "color-red";    // 8H 紅色
+            } else if (b.origCd >= 4) {
+                colorClass = "color-blue";   // 4H 藍色
+            }
+        }
 
         container.innerHTML += `
             <div class="col-6 col-md-4 col-lg-3">
                 <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div class="boss-name text-truncate">${b.name}</div>
+                        <div class="boss-name text-truncate ${colorClass}">${b.name}</div>
                         <span class="badge ${b.type==='fixed'?'badge-fixed':'badge-cd'}">${label}</span>
                     </div>
                     <div class="alias-text text-truncate">${b.alias}</div>
