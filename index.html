@@ -130,4 +130,88 @@ function getInitialData() {
         { name: "殺戮者", type: "cd", cd: 4, origCd: 4, alias: "殺戮", spawn: null, lastDeath: null },
         { name: "茉莉提亞", type: "cd", cd: 4, origCd: 4, alias: "小茉", spawn: null, lastDeath: null },
         { name: "黑蛇騎士團麥肯", type: "cd", cd: 4, origCd: 4, alias: "麥肯", spawn: null, lastDeath: null },
-        { name: "巴爾博薩夫人", type: "cd", cd:
+        { name: "巴爾博薩夫人", type: "cd", cd: 4, origCd: 4, alias: "夫人", spawn: null, lastDeath: null },
+        { name: "乾渴的德雷克", type: "cd", cd: 4, origCd: 4, alias: "海賊,海賊王", spawn: null, lastDeath: null },
+        { name: "大腳瑪幽", type: "cd", cd: 4, origCd: 4, alias: "大腳", spawn: null, lastDeath: null },
+        { name: "卡司特王", type: "cd", cd: 4, origCd: 4, alias: "卡司特", spawn: null, lastDeath: null },
+        { name: "卡爾迪修", type: "cd", cd: 4, origCd: 4, alias: "蜥蜴,蜥蜴王", spawn: null, lastDeath: null },
+
+        /* CD 8H (紅色) */
+        { name: "史前巨鱷", type: "cd", cd: 8, origCd: 8, alias: "巨鱷,鱷魚", spawn: null, lastDeath: null },
+        { name: "奈克偌斯", type: "cd", cd: 8, origCd: 8, alias: "奈克,阿吐巴", spawn: null, lastDeath: null },
+        { name: "烏勒庫斯", type: "cd", cd: 8, origCd: 8, alias: "烏勒", spawn: null, lastDeath: null },
+        { name: "審判者拉馬修", type: "cd", cd: 8, origCd: 8, alias: "拉馬修,蛇女", spawn: null, lastDeath: null },
+        { name: "庫爾托", type: "cd", cd: 8, origCd: 8, alias: "狼王,狼人", spawn: null, lastDeath: null },
+        { name: "頭目哈格碼", type: "cd", cd: 8, origCd: 8, alias: "頭目,哈格碼", spawn: null, lastDeath: null },
+
+        /* CD 12H (紫色) */
+        { name: "巨人", type: "cd", cd: 12, origCd: 12, alias: "巨人王", spawn: null, lastDeath: null }
+    ];
+}
+
+function render() {
+    const container = document.getElementById('bossContainer');
+    container.innerHTML = '';
+    const now = new Date();
+    const today = now.getDay() === 0 ? 7 : now.getDay();
+    const weekMap = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
+
+    let sorted = bosses.map(b => {
+        let sortTime = 9999999999999, isOffDay = false, displayTime = "未記錄", countdownText = "下次重生：", isWarn = false;
+        if(b.type === 'fixed') {
+            if(b.weekday && b.weekday !== today) {
+                isOffDay = true;
+                displayTime = `週(${b.weekday}) ${b.times[0]}`;
+                sortTime = 2000000000000 + (b.weekday * 100000000); 
+            } else {
+                let found = false;
+                for(let t of b.times) {
+                    let target = new Date(); target.setHours(t.split(':')[0], t.split(':')[1], 0, 0);
+                    if((target - now) / 60000 > -5) { sortTime = target.getTime(); displayTime = t; if((target - now) / 60000 <= 5) isWarn = true; found = true; break; }
+                }
+                if(!found) { displayTime = "今日已結束"; isOffDay = true; sortTime = 3000000000000; }
+            }
+        } else if (b.spawn) {
+            sortTime = b.spawn;
+            let diff = (b.spawn - now.getTime()) / 60000;
+            let sDate = new Date(b.spawn);
+            displayTime = sDate.getHours().toString().padStart(2,'0') + ":" + sDate.getMinutes().toString().padStart(2,'0');
+            if(diff <= 5 && diff > 0) isWarn = true;
+            countdownText = diff <= 0 ? "已重生！" : `剩餘 ${Math.floor(diff/60)}時${Math.floor(diff%60)}分`;
+        }
+        return { ...b, sortTime, isOffDay, displayTime, countdownText, isWarn };
+    });
+
+    sorted.sort((a, b) => a.sortTime - b.sortTime);
+
+    sorted.forEach(b => {
+        let label = "固定", colorClass = "color-default";
+        if (b.type === 'fixed') {
+            if (b.weekday) { label = `固定(${weekMap[b.weekday]})`; colorClass = "color-purple"; }
+        } else {
+            label = `CD ${b.cd}h`;
+            if (b.origCd >= 12) colorClass = "color-purple";
+            else if (b.origCd >= 8) colorClass = "color-red";
+            else if (b.origCd >= 4) colorClass = "color-blue";
+        }
+        container.innerHTML += `
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="boss-name text-truncate ${colorClass}">${b.name}</div>
+                        <span class="badge ${b.type==='fixed'?'badge-fixed':'badge-cd'}">${label}</span>
+                    </div>
+                    <div class="alias-text text-truncate">${b.alias}</div>
+                    <div class="info-row">
+                        <div class="label-text">${b.countdownText}</div>
+                        <div class="countdown">${b.displayTime}</div>
+                    </div>
+                </div>
+            </div>`;
+    });
+}
+setInterval(render, 10000); 
+render();
+</script>
+</body>
+</html>s
