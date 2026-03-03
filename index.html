@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>天堂W王團秘書</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
         .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; height: 100%; transition: 0.5s; }
         .boss-name { font-size: 1.05rem; font-weight: bold; }
         .color-default { color: #ffca2c; } 
-        .color-purple { color: #bf40ff; }  /* 紫色：12H、週王 */
-        .color-red { color: #ff4d4d; }     /* 紅色：8H */
-        .color-blue { color: #4da6ff; }    /* 藍色：4H */
+        .color-purple { color: #bf40ff; }
+        .color-red { color: #ff4d4d; }
+        .color-blue { color: #4da6ff; }
         .countdown { font-size: 1.3rem; font-family: 'Segoe UI', monospace; color: #00ff00; font-weight: bold; }
         .warning { background-color: #4a0000 !important; border-color: #ff0000; animation: blinker 1.5s linear infinite; }
         .off-day { opacity: 0.3; filter: grayscale(1); }
@@ -41,13 +41,14 @@
             <button class="btn btn-outline-warning btn-sm m-1" onclick="handleCommand('CD減半')">⚡ CD減半</button>
             <button class="btn btn-outline-secondary btn-sm m-1" onclick="handleCommand('CD恢復')">🔄 CD恢復</button>
             <button class="btn btn-outline-danger btn-sm m-1" onclick="resetData()">🛠️ 載入正確名單</button>
-            <span id="syncStatus" class="badge bg-secondary ms-2">連線中...</span>
+            <span id="syncStatus" class="badge bg-secondary ms-2">等待回應...</span>
         </div>
     </div>
     <div id="bossContainer" class="row g-2"></div>
 </div>
 
 <script>
+// --- 1. Firebase 設定 (請確認與你後台一致) ---
 const firebaseConfig = {
   apiKey: "AIzaSyAiPLZv4zBUDG3z2zQSnlt31K-IOoLW-Gs",
   authDomain: "mybosstimer.firebaseapp.com",
@@ -55,8 +56,7 @@ const firebaseConfig = {
   projectId: "mybosstimer",
   storageBucket: "mybosstimer.firebasestorage.app",
   messagingSenderId: "43002364713",
-  appId: "1:43002364713:web:8a19b0c5eb5eae4d3b6d38",
-  measurementId: "G-NQW3C870WF"
+  appId: "1:43002364713:web:8a19b0c5eb5eae4d3b6d38"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -65,23 +65,34 @@ const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
 
 let bosses = [];
 
+// --- 2. 監聽資料 (核心修復：增加 else 判斷) ---
 dataRef.on('value', (snapshot) => {
     const data = snapshot.val();
-    if (data) {
+    if (data && data.length > 0) {
         bosses = data;
         updateStatus("秘書同步中", "bg-success");
         render();
+    } else {
+        // 如果連上資料庫但裡面沒東西，也要更新狀態讓使用者能點按鈕
+        bosses = [];
+        updateStatus("資料庫為空 (請按紅鈕)", "bg-warning");
+        render(); 
     }
+}, (error) => {
+    updateStatus("連線失敗", "bg-danger");
+    console.error(error);
 });
 
+// --- 3. 重置功能 ---
 function resetData() {
     if(confirm("確定要載入你修正後的【完整 27 隻王】正確名單嗎？")) {
         bosses = getInitialData();
         saveToCloud();
-        alert("名單已根據你的清單正確更新！");
+        alert("名單已上傳雲端！");
     }
 }
 
+// --- 4. 指令功能 ---
 function handleCommand(manual) {
     const input = (manual || document.getElementById('cmd').value).trim();
     document.getElementById('cmd').value = '';
@@ -108,11 +119,14 @@ function handleCommand(manual) {
 }
 
 function saveToCloud() { dataRef.set(bosses); }
-function updateStatus(text, className) { const s = document.getElementById('syncStatus'); s.innerText = text; s.className = "badge ms-2 " + className; }
+function updateStatus(text, className) { 
+    const s = document.getElementById('syncStatus'); 
+    if(s) { s.innerText = text; s.className = "badge ms-2 " + className; }
+}
 
+// --- 5. 你的正確名單庫 ---
 function getInitialData() {
     return [
-        /* 固定王 */
         { name: "阿勒尼亞", type: "fixed", times: ["17:30"], alias: "蜘蛛" },
         { name: "克特", type: "fixed", times: ["18:00"], alias: "克特" },
         { name: "巫師", type: "fixed", times: ["18:20"], alias: "巫師" },
@@ -123,8 +137,6 @@ function getInitialData() {
         { name: "船長卡利索", type: "fixed", weekday: 2, times: ["19:00"], alias: "船長" },
         { name: "狂風的夏斯奇", type: "fixed", weekday: 3, times: ["19:00"], alias: "夏斯奇" },
         { name: "疾風的巨大飛龍", type: "fixed", weekday: 4, times: ["19:00"], alias: "巨飛" },
-
-        /* CD 4H (藍色) */
         { name: "黑虎恰姆帕瓦特", type: "cd", cd: 4, origCd: 4, alias: "黑虎,老虎", spawn: null, lastDeath: null },
         { name: "尼羅德", type: "cd", cd: 4, origCd: 4, alias: "野豬", spawn: null, lastDeath: null },
         { name: "殺戮者", type: "cd", cd: 4, origCd: 4, alias: "殺戮", spawn: null, lastDeath: null },
@@ -135,26 +147,29 @@ function getInitialData() {
         { name: "大腳瑪幽", type: "cd", cd: 4, origCd: 4, alias: "大腳", spawn: null, lastDeath: null },
         { name: "卡司特王", type: "cd", cd: 4, origCd: 4, alias: "卡司特", spawn: null, lastDeath: null },
         { name: "卡爾迪修", type: "cd", cd: 4, origCd: 4, alias: "蜥蜴,蜥蜴王", spawn: null, lastDeath: null },
-
-        /* CD 8H (紅色) */
         { name: "史前巨鱷", type: "cd", cd: 8, origCd: 8, alias: "巨鱷,鱷魚", spawn: null, lastDeath: null },
         { name: "奈克偌斯", type: "cd", cd: 8, origCd: 8, alias: "奈克,阿吐巴", spawn: null, lastDeath: null },
         { name: "烏勒庫斯", type: "cd", cd: 8, origCd: 8, alias: "烏勒", spawn: null, lastDeath: null },
         { name: "審判者拉馬修", type: "cd", cd: 8, origCd: 8, alias: "拉馬修,蛇女", spawn: null, lastDeath: null },
         { name: "庫爾托", type: "cd", cd: 8, origCd: 8, alias: "狼王,狼人", spawn: null, lastDeath: null },
         { name: "頭目哈格碼", type: "cd", cd: 8, origCd: 8, alias: "頭目,哈格碼", spawn: null, lastDeath: null },
-
-        /* CD 12H (紫色) */
         { name: "巨人", type: "cd", cd: 12, origCd: 12, alias: "巨人王", spawn: null, lastDeath: null }
     ];
 }
 
+// --- 6. 渲染功能 ---
 function render() {
     const container = document.getElementById('bossContainer');
+    if(!container) return;
     container.innerHTML = '';
     const now = new Date();
     const today = now.getDay() === 0 ? 7 : now.getDay();
     const weekMap = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
+
+    if(bosses.length === 0) {
+        container.innerHTML = '<div class="col-12 text-center py-5"><h5>資料庫目前沒有名單，請點擊上方紅色按鈕載入。</h5></div>';
+        return;
+    }
 
     let sorted = bosses.map(b => {
         let sortTime = 9999999999999, isOffDay = false, displayTime = "未記錄", countdownText = "下次重生：", isWarn = false;
@@ -214,4 +229,4 @@ setInterval(render, 10000);
 render();
 </script>
 </body>
-</html>s
+</html>
