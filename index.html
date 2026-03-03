@@ -11,13 +11,10 @@
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
         .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; height: 100%; transition: 0.5s; }
         .boss-name { font-size: 1.05rem; font-weight: bold; }
-        
-        /* 顏色分級修正 */
         .color-default { color: #ffca2c; } 
-        .color-purple { color: #bf40ff; }  /* 紫色：週王、CD12H */
-        .color-red { color: #ff4d4d; }     /* 紅色：CD8H */
-        .color-blue { color: #4da6ff; }    /* 藍色：CD4H */
-
+        .color-purple { color: #bf40ff; }
+        .color-red { color: #ff4d4d; }
+        .color-blue { color: #4da6ff; }
         .countdown { font-size: 1.3rem; font-family: 'Segoe UI', monospace; color: #00ff00; font-weight: bold; }
         .warning { background-color: #4a0000 !important; border-color: #ff0000; animation: blinker 1.5s linear infinite; }
         .off-day { opacity: 0.3; filter: grayscale(1); }
@@ -39,12 +36,13 @@
     
     <div class="card p-3 mb-4 shadow">
         <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="1930巨鱷 或 2220老虎">
+            <input type="text" id="cmd" class="form-control" placeholder="1930巨鱷 或 指令">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
         <div class="mt-2 text-center">
             <button class="btn btn-outline-warning btn-sm m-1" onclick="handleCommand('CD減半')">⚡ CD減半</button>
             <button class="btn btn-outline-secondary btn-sm m-1" onclick="handleCommand('CD恢復')">🔄 CD恢復</button>
+            <button class="btn btn-outline-danger btn-sm m-1" onclick="handleCommand('強制修復')">🛠️ 修復名單</button>
             <span id="syncStatus" class="badge bg-secondary ms-2">連線中...</span>
         </div>
     </div>
@@ -68,16 +66,19 @@ const db = firebase.database();
 const dataRef = db.ref('bossData/SECRETARY_PRO_DATA'); 
 
 let bosses = [];
-let isFirstLoad = true;
 
 dataRef.on('value', (snapshot) => {
     const data = snapshot.val();
-    if (!data || data.length < 5) { 
-        if (isFirstLoad) { bosses = getInitialData(); saveToCloud(); }
-    } else { bosses = data; }
+    // 核心修正：檢查資料是否有效，若無名字或長度不足，自動重置
+    if (!data || data.length < 5 || (data[0] && !data[0].name)) {
+        console.log("偵測到無效資料，執行初始化...");
+        bosses = getInitialData();
+        saveToCloud();
+    } else {
+        bosses = data;
+    }
     updateStatus("秘書同步中", "bg-success");
     render();
-    isFirstLoad = false;
 });
 
 function handleCommand(manual) {
@@ -85,28 +86,19 @@ function handleCommand(manual) {
     document.getElementById('cmd').value = '';
     if(!input) return;
     let needUpdate = false;
-    if (input === "CD減半") {
+
+    if (input === "強制修復") {
+        bosses = getInitialData();
+        needUpdate = true;
+    } else if (input === "CD減半") {
         bosses.forEach(b => { if(b.type === 'cd') { b.cd = b.origCd / 2; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); } });
         needUpdate = true;
     } else if (input === "CD恢復") {
         bosses.forEach(b => { if(b.type === 'cd') { b.cd = b.origCd; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); } });
         needUpdate = true;
-    } else if (input.startsWith("新增") || input.startsWith("修改")) {
-        const p = input.split(",");
-        if(p.length >= 3) {
-            const name = p[1], cd = parseFloat(p[2]), alias = p[3] || "";
-            const idx = bosses.findIndex(b => b.name === name);
-            if(idx > -1) bosses[idx] = { ...bosses[idx], cd, origCd: cd, alias };
-            else bosses.push({ name, type: "cd", cd, origCd: cd, alias, spawn: null, lastDeath: null });
-            needUpdate = true;
-        }
-    } else if (input.startsWith("刪除")) {
-        const name = input.split(",")[1];
-        bosses = bosses.filter(b => b.name !== name);
-        needUpdate = true;
     } else if (input.match(/^\d{4}/)) {
         const tStr = input.substring(0,4), alias = input.substring(4);
-        const b = bosses.find(x => x.name.includes(alias) || x.alias.includes(alias));
+        const b = bosses.find(x => x.name && (x.name.includes(alias) || x.alias.includes(alias)));
         if(b && b.type==='cd') {
             let d = new Date(); d.setHours(tStr.substring(0,2), tStr.substring(2,4), 0, 0);
             if(d > new Date()) d.setDate(d.getDate()-1);
@@ -114,6 +106,7 @@ function handleCommand(manual) {
             needUpdate = true;
         }
     }
+    
     if(needUpdate) { flashStatus(); saveToCloud(); }
 }
 
@@ -184,31 +177,22 @@ function render() {
     sorted.forEach(b => {
         let label = "固定";
         let colorClass = "color-default";
-
         if (b.type === 'fixed') {
-            if (b.weekday) {
-                label = `固定(${weekMap[b.weekday]})`;
-                colorClass = "color-purple";
-            }
+            if (b.weekday) { label = `固定(${weekMap[b.weekday]})`; colorClass = "color-purple"; }
         } else if (b.type === 'cd') {
             label = `CD ${b.cd}h`;
-            if (b.origCd >= 12) {
-                colorClass = "color-purple"; // 12H 紫色
-            } else if (b.origCd >= 8) {
-                colorClass = "color-red";    // 8H 紅色
-            } else if (b.origCd >= 4) {
-                colorClass = "color-blue";   // 4H 藍色
-            }
+            if (b.origCd >= 12) colorClass = "color-purple";
+            else if (b.origCd >= 8) colorClass = "color-red";
+            else if (b.origCd >= 4) colorClass = "color-blue";
         }
-
         container.innerHTML += `
             <div class="col-6 col-md-4 col-lg-3">
                 <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div class="boss-name text-truncate ${colorClass}">${b.name}</div>
+                        <div class="boss-name text-truncate ${colorClass}">${b.name || "未知"}</div>
                         <span class="badge ${b.type==='fixed'?'badge-fixed':'badge-cd'}">${label}</span>
                     </div>
-                    <div class="alias-text text-truncate">${b.alias}</div>
+                    <div class="alias-text text-truncate">${b.alias || ""}</div>
                     <div class="info-row">
                         <div class="label-text">${b.countdownText}</div>
                         <div class="countdown">${b.displayTime}</div>
