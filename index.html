@@ -12,9 +12,9 @@
         .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; height: 100%; transition: 0.5s; }
         .boss-name { font-size: 1.05rem; font-weight: bold; }
         .color-default { color: #ffca2c; } 
-        .color-purple { color: #bf40ff; }
-        .color-red { color: #ff4d4d; }
-        .color-blue { color: #4da6ff; }
+        .color-purple { color: #bf40ff; }  /* 紫色：週王、CD12H */
+        .color-red { color: #ff4d4d; }     /* 紅色：CD8H */
+        .color-blue { color: #4da6ff; }    /* 藍色：CD4H */
         .countdown { font-size: 1.3rem; font-family: 'Segoe UI', monospace; color: #00ff00; font-weight: bold; }
         .warning { background-color: #4a0000 !important; border-color: #ff0000; animation: blinker 1.5s linear infinite; }
         .off-day { opacity: 0.3; filter: grayscale(1); }
@@ -26,7 +26,6 @@
         .info-row { border-top: 1px solid #333; margin-top: auto; padding-top: 8px; }
         .label-text { font-size: 0.75rem; color: #aaa; }
         #syncStatus.sync-flash { animation: flash 0.5s ease; }
-        @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.3; background-color: #ffca2c; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -36,13 +35,13 @@
     
     <div class="card p-3 mb-4 shadow">
         <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="1930巨鱷 或 指令">
+            <input type="text" id="cmd" class="form-control" placeholder="輸入時間(如1200巨鱷)">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
         <div class="mt-2 text-center">
             <button class="btn btn-outline-warning btn-sm m-1" onclick="handleCommand('CD減半')">⚡ CD減半</button>
             <button class="btn btn-outline-secondary btn-sm m-1" onclick="handleCommand('CD恢復')">🔄 CD恢復</button>
-            <button class="btn btn-outline-danger btn-sm m-1" onclick="handleCommand('強制修復')">🛠️ 修復名單</button>
+            <button class="btn btn-outline-danger btn-sm m-1" onclick="resetData()">🛠️ 重置名單</button>
             <span id="syncStatus" class="badge bg-secondary ms-2">連線中...</span>
         </div>
     </div>
@@ -67,19 +66,26 @@ const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
 
 let bosses = [];
 
+// 1. 監聽資料庫：只負責讀取，絕不自動寫入
 dataRef.on('value', (snapshot) => {
     const data = snapshot.val();
-    // 核心修正：檢查資料是否有效，若無名字或長度不足，自動重置
-    if (!data || data.length < 5 || (data[0] && !data[0].name)) {
-        console.log("偵測到無效資料，執行初始化...");
+    if (data) {
+        bosses = data;
+        updateStatus("秘書同步中", "bg-success");
+        render();
+    } else {
+        updateStatus("資料庫為空", "bg-warning");
+    }
+});
+
+// 2. 手動重置功能
+function resetData() {
+    if(confirm("警告：這將會找回消失的王怪名字，但會清除所有目前的死亡紀錄！是否確定？")) {
         bosses = getInitialData();
         saveToCloud();
-    } else {
-        bosses = data;
+        alert("名單已恢復！請重新回報王怪時間。");
     }
-    updateStatus("秘書同步中", "bg-success");
-    render();
-});
+}
 
 function handleCommand(manual) {
     const input = (manual || document.getElementById('cmd').value).trim();
@@ -87,10 +93,7 @@ function handleCommand(manual) {
     if(!input) return;
     let needUpdate = false;
 
-    if (input === "強制修復") {
-        bosses = getInitialData();
-        needUpdate = true;
-    } else if (input === "CD減半") {
+    if (input === "CD減半") {
         bosses.forEach(b => { if(b.type === 'cd') { b.cd = b.origCd / 2; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); } });
         needUpdate = true;
     } else if (input === "CD恢復") {
@@ -98,7 +101,7 @@ function handleCommand(manual) {
         needUpdate = true;
     } else if (input.match(/^\d{4}/)) {
         const tStr = input.substring(0,4), alias = input.substring(4);
-        const b = bosses.find(x => x.name && (x.name.includes(alias) || x.alias.includes(alias)));
+        const b = bosses.find(x => x.name.includes(alias) || x.alias.includes(alias));
         if(b && b.type==='cd') {
             let d = new Date(); d.setHours(tStr.substring(0,2), tStr.substring(2,4), 0, 0);
             if(d > new Date()) d.setDate(d.getDate()-1);
@@ -106,13 +109,11 @@ function handleCommand(manual) {
             needUpdate = true;
         }
     }
-    
-    if(needUpdate) { flashStatus(); saveToCloud(); }
+    if(needUpdate) { saveToCloud(); }
 }
 
 function saveToCloud() { dataRef.set(bosses); }
 function updateStatus(text, className) { const s = document.getElementById('syncStatus'); s.innerText = text; s.className = "badge ms-2 " + className; }
-function flashStatus() { const s = document.getElementById('syncStatus'); s.classList.add('sync-flash'); setTimeout(() => s.classList.remove('sync-flash'), 500); }
 
 function getInitialData() {
     return [
@@ -175,11 +176,10 @@ function render() {
     sorted.sort((a, b) => a.sortTime - b.sortTime);
 
     sorted.forEach(b => {
-        let label = "固定";
-        let colorClass = "color-default";
+        let label = "固定", colorClass = "color-default";
         if (b.type === 'fixed') {
             if (b.weekday) { label = `固定(${weekMap[b.weekday]})`; colorClass = "color-purple"; }
-        } else if (b.type === 'cd') {
+        } else {
             label = `CD ${b.cd}h`;
             if (b.origCd >= 12) colorClass = "color-purple";
             else if (b.origCd >= 8) colorClass = "color-red";
@@ -189,10 +189,10 @@ function render() {
             <div class="col-6 col-md-4 col-lg-3">
                 <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div class="boss-name text-truncate ${colorClass}">${b.name || "未知"}</div>
+                        <div class="boss-name text-truncate ${colorClass}">${b.name}</div>
                         <span class="badge ${b.type==='fixed'?'badge-fixed':'badge-cd'}">${label}</span>
                     </div>
-                    <div class="alias-text text-truncate">${b.alias || ""}</div>
+                    <div class="alias-text text-truncate">${b.alias}</div>
                     <div class="info-row">
                         <div class="label-text">${b.countdownText}</div>
                         <div class="countdown">${b.displayTime}</div>
