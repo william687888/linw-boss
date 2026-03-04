@@ -64,10 +64,18 @@ const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
 
 let bosses = [];
 
+// 監聽雲端資料
 dataRef.on('value', (snapshot) => {
     const data = snapshot.val();
     if (data && data.length > 0) {
-        bosses = data;
+        // --- 自動校正邏輯：把舊名字改成新名字，但不影響重生時間 ---
+        bosses = data.map(b => {
+            if (b.name === "茉莉提亞") {
+                b.name = "屠殺者莫利提亞";
+                b.alias = "小莫,莫利提亞";
+            }
+            return b;
+        });
         updateStatus("秘書同步中", "bg-success");
         render();
     } else {
@@ -77,6 +85,7 @@ dataRef.on('value', (snapshot) => {
     }
 });
 
+// 管理員重置功能 (含動態密碼)
 function resetData() {
     const now = new Date();
     const Y = now.getFullYear();
@@ -87,7 +96,7 @@ function resetData() {
     const userInput = prompt("請輸入管理員授權碼：");
     
     if (userInput === correctPassword) {
-        if(confirm("授權成功。警告：這將會清除所有重生時間紀錄，確定執行？")) {
+        if(confirm("授權成功。警告：這將會清除所有重生紀錄，確定執行？")) {
             bosses = getInitialData();
             saveToCloud();
             alert("已恢復至初始名單。");
@@ -173,7 +182,7 @@ function render() {
     const weekMap = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
 
     if(bosses.length === 0) {
-        container.innerHTML = '<div class="col-12 text-center py-5"><h5>連線成功，等待管理員初始化。</h5></div>';
+        container.innerHTML = '<div class="col-12 text-center py-5"><h5>連線中，請稍候...</h5></div>';
         return;
     }
 
