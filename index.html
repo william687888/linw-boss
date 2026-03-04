@@ -40,7 +40,7 @@
         <div class="mt-2 text-center">
             <button class="btn btn-outline-warning btn-sm m-1" onclick="handleCommand('CD減半')">⚡ CD減半</button>
             <button class="btn btn-outline-secondary btn-sm m-1" onclick="handleCommand('CD恢復')">🔄 CD恢復</button>
-            <button class="btn btn-outline-danger btn-sm m-1" onclick="resetData()">🛠️ 載入正確名單</button>
+            <button class="btn btn-outline-danger btn-sm m-1" onclick="resetData()">🛠️ 管理員重置</button>
             <span id="syncStatus" class="badge bg-secondary ms-2">等待回應...</span>
         </div>
     </div>
@@ -72,18 +72,28 @@ dataRef.on('value', (snapshot) => {
         render();
     } else {
         bosses = [];
-        updateStatus("資料庫為空 (請按紅鈕)", "bg-warning");
+        updateStatus("雲端無資料", "bg-warning");
         render(); 
     }
-}, (error) => {
-    updateStatus("連線失敗", "bg-danger");
 });
 
 function resetData() {
-    if(confirm("確定要載入包含【飛龍4區、夫人、哈格碼】等 31 隻王的名單嗎？")) {
-        bosses = getInitialData();
-        saveToCloud();
-        alert("正確名單已同步至雲端！");
+    const now = new Date();
+    const Y = now.getFullYear();
+    const M = now.getMonth() + 1;
+    const D = now.getDate();
+    const correctPassword = (Y + M + D).toString();
+
+    const userInput = prompt("請輸入管理員授權碼：");
+    
+    if (userInput === correctPassword) {
+        if(confirm("授權成功。警告：這將會清除所有重生時間紀錄，確定執行？")) {
+            bosses = getInitialData();
+            saveToCloud();
+            alert("已恢復至初始名單。");
+        }
+    } else if (userInput !== null) {
+        alert("密碼錯誤！");
     }
 }
 
@@ -170,7 +180,7 @@ function render() {
     const weekMap = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
 
     if(bosses.length === 0) {
-        container.innerHTML = '<div class="col-12 text-center py-5"><h5>資料庫連線中或為空，請點擊上方紅色按鈕載入名單。</h5></div>';
+        container.innerHTML = '<div class="col-12 text-center py-5"><h5>連線成功，等待管理員初始化。</h5></div>';
         return;
     }
 
