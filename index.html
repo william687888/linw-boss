@@ -34,7 +34,7 @@
     
     <div class="card p-3 mb-4 shadow">
         <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="輸入 1200龍1 或 1530夫人">
+            <input type="text" id="cmd" class="form-control" placeholder="輸入 1200龍1 或 1530小莫">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
         <div class="mt-2 text-center">
@@ -130,7 +130,6 @@ function updateStatus(text, className) {
 
 function getInitialData() {
     return [
-        /* 固定王 */
         { name: "阿勒尼亞", type: "fixed", times: ["17:30"], alias: "蜘蛛" },
         { name: "克特", type: "fixed", times: ["18:00"], alias: "克特" },
         { name: "巫師", type: "fixed", times: ["18:20"], alias: "巫師" },
@@ -141,12 +140,10 @@ function getInitialData() {
         { name: "船長卡利索", type: "fixed", weekday: 2, times: ["19:00"], alias: "船長" },
         { name: "狂風的夏斯奇", type: "fixed", weekday: 3, times: ["19:00"], alias: "夏斯奇" },
         { name: "疾風的巨大飛龍", type: "fixed", weekday: 4, times: ["19:00"], alias: "巨飛" },
-
-        /* CD 4H (藍色) */
         { name: "黑虎恰姆帕瓦特", type: "cd", cd: 4, origCd: 4, alias: "黑虎,老虎", spawn: null, lastDeath: null },
         { name: "尼羅德", type: "cd", cd: 4, origCd: 4, alias: "野豬", spawn: null, lastDeath: null },
         { name: "殺戮者", type: "cd", cd: 4, origCd: 4, alias: "殺戮", spawn: null, lastDeath: null },
-        { name: "茉莉提亞", type: "cd", cd: 4, origCd: 4, alias: "小茉", spawn: null, lastDeath: null },
+        { name: "屠殺者莫利提亞", type: "cd", cd: 4, origCd: 4, alias: "小莫,莫利提亞", spawn: null, lastDeath: null },
         { name: "黑蛇騎士團麥肯", type: "cd", cd: 4, origCd: 4, alias: "麥肯", spawn: null, lastDeath: null },
         { name: "巴爾博薩夫人", type: "cd", cd: 4, origCd: 4, alias: "夫人", spawn: null, lastDeath: null },
         { name: "乾渴的德雷克", type: "cd", cd: 4, origCd: 4, alias: "海賊,海賊王", spawn: null, lastDeath: null },
@@ -157,16 +154,12 @@ function getInitialData() {
         { name: "飛龍2區", type: "cd", cd: 4, origCd: 4, alias: "龍2,飛龍2", spawn: null, lastDeath: null },
         { name: "飛龍3區", type: "cd", cd: 4, origCd: 4, alias: "龍3,飛龍3", spawn: null, lastDeath: null },
         { name: "飛龍4區", type: "cd", cd: 4, origCd: 4, alias: "龍4,飛龍4", spawn: null, lastDeath: null },
-
-        /* CD 8H (紅色) */
         { name: "史前巨鱷", type: "cd", cd: 8, origCd: 8, alias: "巨鱷,鱷魚", spawn: null, lastDeath: null },
         { name: "奈克偌斯", type: "cd", cd: 8, origCd: 8, alias: "奈克,阿吐巴", spawn: null, lastDeath: null },
         { name: "烏勒庫斯", type: "cd", cd: 8, origCd: 8, alias: "烏勒", spawn: null, lastDeath: null },
         { name: "審判者拉馬修", type: "cd", cd: 8, origCd: 8, alias: "拉馬修,蛇女", spawn: null, lastDeath: null },
         { name: "庫爾托", type: "cd", cd: 8, origCd: 8, alias: "狼王,狼人", spawn: null, lastDeath: null },
         { name: "頭目哈格碼", type: "cd", cd: 8, origCd: 8, alias: "頭目,哈格碼", spawn: null, lastDeath: null },
-
-        /* CD 12H (紫色) */
         { name: "巨人", type: "cd", cd: 12, origCd: 12, alias: "巨人王", spawn: null, lastDeath: null }
     ];
 }
