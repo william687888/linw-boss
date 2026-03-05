@@ -90,11 +90,15 @@ function quickFill(fullName) {
 
 function resetData() {
     const now = new Date();
-    const correctPassword = (now.getFullYear() + (now.getMonth() + 1) + now.getDate()).toString();
-    const userInput = prompt("請輸入管理員授權碼：");
+    const Y = now.getFullYear();
+    const M = now.getMonth() + 1;
+    const D = now.getDate();
+    const correctPassword = Y + "-" + M + "-" + D;
+
+    const userInput = prompt("請輸入管理員授權碼 (格式: " + correctPassword + ")：");
     if (userInput === correctPassword) {
-        if(confirm("確定要恢復初始名單？時間會清空。")) { bosses = getInitialData(); saveToCloud(); }
-    } else if (userInput !== null) { alert("密碼錯誤！"); }
+        if(confirm("授權成功。警告：這將會清除所有重生紀錄，確定執行？")) { bosses = getInitialData(); saveToCloud(); }
+    } else if (userInput !== null) { alert("密碼錯誤！今日正確格式為：" + correctPassword); }
 }
 
 function handleCommand(manual) {
@@ -116,15 +120,12 @@ function handleCommand(manual) {
     } else {
         let tMatch = input.match(/\d{4}/);
         let namePart = input.replace(/\d{4}/, "").trim();
-        
         if(tMatch && namePart) {
             const tStr = tMatch[0];
-            // 強化寬鬆比對：支援「1200莫利提亞」或「莫利提亞1200」
             const b = bosses.find(x => 
                 (x.name && (x.name.includes(namePart) || namePart.includes(x.name))) || 
                 (x.alias && x.alias.split(',').some(a => namePart.includes(a) || a.includes(namePart)))
             );
-
             if(b && b.type==='cd') {
                 let d = new Date();
                 d.setHours(tStr.substring(0,2), tStr.substring(2,4), 0, 0);
@@ -183,9 +184,7 @@ function render() {
     const now = new Date();
     const today = now.getDay() === 0 ? 7 : now.getDay();
     const weekMap = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
-
     if(bosses.length === 0) return;
-
     let sorted = bosses.map(b => {
         let sortTime = 9999999999999, isOffDay = false, displayTime = "未記錄", countdownText = "下次重生：", isWarn = false;
         if(b.type === 'fixed') {
@@ -209,9 +208,7 @@ function render() {
         }
         return { ...b, sortTime, isOffDay, displayTime, countdownText, isWarn };
     });
-
     sorted.sort((a, b) => a.sortTime - b.sortTime);
-
     sorted.forEach(b => {
         let label = b.type==='fixed' ? "固定" : `CD ${b.cd}h`;
         let colorClass = "color-default";
@@ -219,7 +216,6 @@ function render() {
         else if (b.origCd >= 12) colorClass = "color-purple";
         else if (b.origCd >= 8) colorClass = "color-red";
         else if (b.origCd >= 4) colorClass = "color-blue";
-
         container.innerHTML += `
             <div class="col-6 col-md-4 col-lg-3">
                 <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}" onclick="quickFill('${b.name}')">
