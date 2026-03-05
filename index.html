@@ -9,23 +9,23 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
-        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; transition: 0.2s; cursor: pointer; }
-        .card:active { transform: scale(0.96); background-color: #2a2a2a; }
-        .boss-name { font-size: 1.05rem; font-weight: bold; }
+        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; transition: 0.1s; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .card:active { transform: scale(0.95); background-color: #333; }
+        .boss-name { font-size: 1.05rem; font-weight: bold; pointer-events: none; }
         .color-default { color: #ffca2c; } 
         .color-purple { color: #bf40ff; }
         .color-red { color: #ff4d4d; }
         .color-blue { color: #4da6ff; }
-        .countdown { font-size: 1.3rem; font-family: 'Segoe UI', monospace; color: #00ff00; font-weight: bold; }
+        .countdown { font-size: 1.3rem; font-family: 'Segoe UI', monospace; color: #00ff00; font-weight: bold; pointer-events: none; }
         .warning { background-color: #4a0000 !important; border-color: #ff0000; animation: blinker 1.5s linear infinite; }
         .off-day { opacity: 0.3; filter: grayscale(1); }
         @keyframes blinker { 50% { opacity: 0.7; } }
         .btn-gold { background-color: #ffca2c; color: #000; font-weight: bold; border: none; }
-        #cmd { background-color: #2a2a2a; color: #fff; border: 1px solid #ffca2c; font-weight: bold; }
+        #cmd { background-color: #2a2a2a; color: #fff; border: 1px solid #ffca2c; font-weight: bold; font-size: 1.1rem; }
         .badge-fixed { background-color: #0d6efd; padding: 4px 8px; font-size: 0.75rem; }
         .badge-cd { background-color: #6c757d; padding: 4px 8px; font-size: 0.75rem; }
-        .alias-text { font-size: 0.75rem; color: #888; margin-bottom: 5px; }
-        .info-row { border-top: 1px solid #333; margin-top: auto; padding-top: 8px; }
+        .alias-text { font-size: 0.75rem; color: #888; margin-bottom: 5px; pointer-events: none; }
+        .info-row { border-top: 1px solid #333; margin-top: auto; padding-top: 8px; pointer-events: none; }
         .label-text { font-size: 0.75rem; color: #aaa; }
     </style>
 </head>
@@ -36,7 +36,7 @@
     
     <div class="card p-3 mb-4 shadow" style="cursor: default;">
         <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="點擊下方王名，再輸入時間 (如 1200)">
+            <input type="text" id="cmd" class="form-control" placeholder="點擊下方王名，再輸入時間">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
         <div class="mt-2 text-center">
@@ -79,14 +79,15 @@ dataRef.on('value', (snapshot) => {
     }
 });
 
-// 快速填入全名功能
+// 強化的快速填入功能
 function quickFill(fullName) {
     const cmdInput = document.getElementById('cmd');
-    // 直接填入全名
     cmdInput.value = fullName;
     cmdInput.focus();
-    // 將游標移到最前面，這樣妳點完名字，按數字鍵盤就會出現在名字前面
-    cmdInput.setSelectionRange(0, 0);
+    // 延遲一下下確保 focus 成功後再移動游標 (解決手機鍵盤彈出的閃爍問題)
+    setTimeout(() => {
+        cmdInput.setSelectionRange(0, 0);
+    }, 50);
 }
 
 function resetData() {
@@ -109,7 +110,6 @@ function handleCommand(manual) {
         bosses.forEach(b => { if(b.type === 'cd') { b.cd = isHalf ? b.origCd / 2 : b.origCd; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); } });
         needUpdate = true;
     } else {
-        // 同時支援「1200全名」或「全名1200」
         let tStr = input.match(/\d{4}/);
         let namePart = input.replace(/\d{4}/, "").trim();
         if(tStr && namePart) {
@@ -207,6 +207,7 @@ function render() {
         else if (b.origCd >= 8) colorClass = "color-red";
         else if (b.origCd >= 4) colorClass = "color-blue";
 
+        // 核心修改：將 onclick 放在最外層，並確保內容不干擾點擊
         container.innerHTML += `
             <div class="col-6 col-md-4 col-lg-3">
                 <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}" onclick="quickFill('${b.name}')">
