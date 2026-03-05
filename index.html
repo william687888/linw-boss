@@ -10,7 +10,7 @@
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
         .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; transition: 0.1s; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .card:active { transform: scale(0.95); background-color: #333; }
+        .card:active { transform: scale(0.96); background-color: #333; }
         .boss-name { font-size: 1.05rem; font-weight: bold; pointer-events: none; }
         .color-default { color: #ffca2c; } 
         .color-purple { color: #bf40ff; }
@@ -36,7 +36,7 @@
     
     <div class="card p-3 mb-4 shadow" style="cursor: default;">
         <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="點擊下方王名，再輸入時間">
+            <input type="text" id="cmd" class="form-control" placeholder="點擊下方王名，再輸入時間" onkeypress="if(event.keyCode==13) handleCommand()">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
         <div class="mt-2 text-center">
@@ -79,12 +79,10 @@ dataRef.on('value', (snapshot) => {
     }
 });
 
-// 強化的快速填入功能
 function quickFill(fullName) {
     const cmdInput = document.getElementById('cmd');
     cmdInput.value = fullName;
     cmdInput.focus();
-    // 延遲一下下確保 focus 成功後再移動游標 (解決手機鍵盤彈出的閃爍問題)
     setTimeout(() => {
         cmdInput.setSelectionRange(0, 0);
     }, 50);
@@ -100,24 +98,39 @@ function resetData() {
 }
 
 function handleCommand(manual) {
-    const input = (manual || document.getElementById('cmd').value).trim();
-    document.getElementById('cmd').value = '';
+    const cmdInput = document.getElementById('cmd');
+    const input = (manual || cmdInput.value).trim();
+    cmdInput.value = '';
     if(!input) return;
     let needUpdate = false;
 
     if (input === "CD減半" || input === "CD恢復") {
         const isHalf = input === "CD減半";
-        bosses.forEach(b => { if(b.type === 'cd') { b.cd = isHalf ? b.origCd / 2 : b.origCd; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); } });
+        bosses.forEach(b => { 
+            if(b.type === 'cd') { 
+                b.cd = isHalf ? b.origCd / 2 : b.origCd; 
+                if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); 
+            } 
+        });
         needUpdate = true;
     } else {
-        let tStr = input.match(/\d{4}/);
+        let tMatch = input.match(/\d{4}/);
         let namePart = input.replace(/\d{4}/, "").trim();
-        if(tStr && namePart) {
-            const b = bosses.find(x => (x.name && x.name.includes(namePart)) || (x.alias && x.alias.includes(namePart)));
+        
+        if(tMatch && namePart) {
+            const tStr = tMatch[0];
+            // 強化寬鬆比對：支援「1200莫利提亞」或「莫利提亞1200」
+            const b = bosses.find(x => 
+                (x.name && (x.name.includes(namePart) || namePart.includes(x.name))) || 
+                (x.alias && x.alias.split(',').some(a => namePart.includes(a) || a.includes(namePart)))
+            );
+
             if(b && b.type==='cd') {
-                let d = new Date(); d.setHours(tStr[0].substring(0,2), tStr[0].substring(2,4), 0, 0);
+                let d = new Date();
+                d.setHours(tStr.substring(0,2), tStr.substring(2,4), 0, 0);
                 if(d > new Date()) d.setDate(d.getDate()-1);
-                b.lastDeath = d.getTime(); b.spawn = b.lastDeath + (b.cd * 3600000);
+                b.lastDeath = d.getTime();
+                b.spawn = b.lastDeath + (b.cd * 3600000);
                 needUpdate = true;
             }
         }
@@ -207,7 +220,6 @@ function render() {
         else if (b.origCd >= 8) colorClass = "color-red";
         else if (b.origCd >= 4) colorClass = "color-blue";
 
-        // 核心修改：將 onclick 放在最外層，並確保內容不干擾點擊
         container.innerHTML += `
             <div class="col-6 col-md-4 col-lg-3">
                 <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}" onclick="quickFill('${b.name}')">
