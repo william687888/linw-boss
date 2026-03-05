@@ -9,7 +9,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
-        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; height: 100%; transition: 0.5s; }
+        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; transition: 0.2s; cursor: pointer; }
+        .card:active { transform: scale(0.96); background-color: #2a2a2a; }
         .boss-name { font-size: 1.05rem; font-weight: bold; }
         .color-default { color: #ffca2c; } 
         .color-purple { color: #bf40ff; }
@@ -20,6 +21,7 @@
         .off-day { opacity: 0.3; filter: grayscale(1); }
         @keyframes blinker { 50% { opacity: 0.7; } }
         .btn-gold { background-color: #ffca2c; color: #000; font-weight: bold; border: none; }
+        #cmd { background-color: #2a2a2a; color: #fff; border: 1px solid #ffca2c; font-weight: bold; }
         .badge-fixed { background-color: #0d6efd; padding: 4px 8px; font-size: 0.75rem; }
         .badge-cd { background-color: #6c757d; padding: 4px 8px; font-size: 0.75rem; }
         .alias-text { font-size: 0.75rem; color: #888; margin-bottom: 5px; }
@@ -32,9 +34,9 @@
 <div class="container py-4">
     <h3 class="text-center mb-4">🛡️ 天堂W王團秘書</h3>
     
-    <div class="card p-3 mb-4 shadow">
+    <div class="card p-3 mb-4 shadow" style="cursor: default;">
         <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="輸入 1200龍1 或 1530小莫">
+            <input type="text" id="cmd" class="form-control" placeholder="點擊下方王名，再輸入時間 (如 1200)">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
         <div class="mt-2 text-center">
@@ -64,46 +66,36 @@ const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
 
 let bosses = [];
 
-// 監聽雲端資料
 dataRef.on('value', (snapshot) => {
     const data = snapshot.val();
     if (data && data.length > 0) {
-        // --- 自動校正邏輯：把舊名字改成新名字，但不影響重生時間 ---
         bosses = data.map(b => {
-            if (b.name === "茉莉提亞") {
-                b.name = "屠殺者莫利提亞";
-                b.alias = "小莫,莫利提亞";
-            }
+            if (b.name === "茉莉提亞") { b.name = "屠殺者莫利提亞"; b.alias = "小莫,莫利提亞"; }
             return b;
         });
-        updateStatus("秘書同步中", "bg-success");
         render();
-    } else {
-        bosses = [];
-        updateStatus("雲端無資料", "bg-warning");
-        render(); 
+        const s = document.getElementById('syncStatus');
+        if(s) { s.innerText = "秘書同步中"; s.className = "badge ms-2 bg-success"; }
     }
 });
 
-// 管理員重置功能 (含動態密碼)
+// 快速填入全名功能
+function quickFill(fullName) {
+    const cmdInput = document.getElementById('cmd');
+    // 直接填入全名
+    cmdInput.value = fullName;
+    cmdInput.focus();
+    // 將游標移到最前面，這樣妳點完名字，按數字鍵盤就會出現在名字前面
+    cmdInput.setSelectionRange(0, 0);
+}
+
 function resetData() {
     const now = new Date();
-    const Y = now.getFullYear();
-    const M = now.getMonth() + 1;
-    const D = now.getDate();
-    const correctPassword = (Y + M + D).toString();
-
+    const correctPassword = (now.getFullYear() + (now.getMonth() + 1) + now.getDate()).toString();
     const userInput = prompt("請輸入管理員授權碼：");
-    
     if (userInput === correctPassword) {
-        if(confirm("授權成功。警告：這將會清除所有重生紀錄，確定執行？")) {
-            bosses = getInitialData();
-            saveToCloud();
-            alert("已恢復至初始名單。");
-        }
-    } else if (userInput !== null) {
-        alert("密碼錯誤！");
-    }
+        if(confirm("確定要恢復初始名單？時間會清空。")) { bosses = getInitialData(); saveToCloud(); }
+    } else if (userInput !== null) { alert("密碼錯誤！"); }
 }
 
 function handleCommand(manual) {
@@ -112,30 +104,28 @@ function handleCommand(manual) {
     if(!input) return;
     let needUpdate = false;
 
-    if (input === "CD減半") {
-        bosses.forEach(b => { if(b.type === 'cd') { b.cd = b.origCd / 2; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); } });
+    if (input === "CD減半" || input === "CD恢復") {
+        const isHalf = input === "CD減半";
+        bosses.forEach(b => { if(b.type === 'cd') { b.cd = isHalf ? b.origCd / 2 : b.origCd; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); } });
         needUpdate = true;
-    } else if (input === "CD恢復") {
-        bosses.forEach(b => { if(b.type === 'cd') { b.cd = b.origCd; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); } });
-        needUpdate = true;
-    } else if (input.match(/^\d{4}/)) {
-        const tStr = input.substring(0,4), alias = input.substring(4);
-        const b = bosses.find(x => (x.name && x.name.includes(alias)) || (x.alias && x.alias.includes(alias)));
-        if(b && b.type==='cd') {
-            let d = new Date(); d.setHours(tStr.substring(0,2), tStr.substring(2,4), 0, 0);
-            if(d > new Date()) d.setDate(d.getDate()-1);
-            b.lastDeath = d.getTime(); b.spawn = b.lastDeath + (b.cd * 3600000);
-            needUpdate = true;
+    } else {
+        // 同時支援「1200全名」或「全名1200」
+        let tStr = input.match(/\d{4}/);
+        let namePart = input.replace(/\d{4}/, "").trim();
+        if(tStr && namePart) {
+            const b = bosses.find(x => (x.name && x.name.includes(namePart)) || (x.alias && x.alias.includes(namePart)));
+            if(b && b.type==='cd') {
+                let d = new Date(); d.setHours(tStr[0].substring(0,2), tStr[0].substring(2,4), 0, 0);
+                if(d > new Date()) d.setDate(d.getDate()-1);
+                b.lastDeath = d.getTime(); b.spawn = b.lastDeath + (b.cd * 3600000);
+                needUpdate = true;
+            }
         }
     }
-    if(needUpdate) { saveToCloud(); }
+    if(needUpdate) saveToCloud();
 }
 
 function saveToCloud() { dataRef.set(bosses); }
-function updateStatus(text, className) { 
-    const s = document.getElementById('syncStatus'); 
-    if(s) { s.innerText = text; s.className = "badge ms-2 " + className; }
-}
 
 function getInitialData() {
     return [
@@ -181,18 +171,13 @@ function render() {
     const today = now.getDay() === 0 ? 7 : now.getDay();
     const weekMap = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
 
-    if(bosses.length === 0) {
-        container.innerHTML = '<div class="col-12 text-center py-5"><h5>連線中，請稍候...</h5></div>';
-        return;
-    }
+    if(bosses.length === 0) return;
 
     let sorted = bosses.map(b => {
         let sortTime = 9999999999999, isOffDay = false, displayTime = "未記錄", countdownText = "下次重生：", isWarn = false;
         if(b.type === 'fixed') {
             if(b.weekday && b.weekday !== today) {
-                isOffDay = true;
-                displayTime = `週(${b.weekday}) ${b.times[0]}`;
-                sortTime = 2000000000000 + (b.weekday * 100000000); 
+                isOffDay = true; displayTime = `週(${b.weekday}) ${b.times[0]}`; sortTime = 2000000000000 + (b.weekday * 100000000); 
             } else {
                 let found = false;
                 for(let t of b.times) {
@@ -215,18 +200,16 @@ function render() {
     sorted.sort((a, b) => a.sortTime - b.sortTime);
 
     sorted.forEach(b => {
-        let label = "固定", colorClass = "color-default";
-        if (b.type === 'fixed') {
-            if (b.weekday) { label = `固定(${weekMap[b.weekday]})`; colorClass = "color-purple"; }
-        } else {
-            label = `CD ${b.cd}h`;
-            if (b.origCd >= 12) colorClass = "color-purple";
-            else if (b.origCd >= 8) colorClass = "color-red";
-            else if (b.origCd >= 4) colorClass = "color-blue";
-        }
+        let label = b.type==='fixed' ? "固定" : `CD ${b.cd}h`;
+        let colorClass = "color-default";
+        if (b.type === 'fixed' && b.weekday) colorClass = "color-purple";
+        else if (b.origCd >= 12) colorClass = "color-purple";
+        else if (b.origCd >= 8) colorClass = "color-red";
+        else if (b.origCd >= 4) colorClass = "color-blue";
+
         container.innerHTML += `
             <div class="col-6 col-md-4 col-lg-3">
-                <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}">
+                <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}" onclick="quickFill('${b.name}')">
                     <div class="d-flex justify-content-between align-items-start">
                         <div class="boss-name text-truncate ${colorClass}">${b.name}</div>
                         <span class="badge ${b.type==='fixed'?'badge-fixed':'badge-cd'}">${label}</span>
@@ -240,7 +223,7 @@ function render() {
             </div>`;
     });
 }
-setInterval(render, 10000); 
+setInterval(render, 30000); 
 render();
 </script>
 </body>
