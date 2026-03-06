@@ -93,12 +93,16 @@ function resetData() {
     const Y = now.getFullYear();
     const M = now.getMonth() + 1;
     const D = now.getDate();
+    // 密碼邏輯保持為 年-月-日
     const correctPassword = Y + "-" + M + "-" + D;
 
-    const userInput = prompt("請輸入管理員授權碼 (格式: " + correctPassword + ")：");
+    // 移除所有格式提示，回歸純粹的輸入框
+    const userInput = prompt("請輸入管理員授權碼：");
     if (userInput === correctPassword) {
         if(confirm("授權成功。警告：這將會清除所有重生紀錄，確定執行？")) { bosses = getInitialData(); saveToCloud(); }
-    } else if (userInput !== null) { alert("密碼錯誤！今日正確格式為：" + correctPassword); }
+    } else if (userInput !== null) { 
+        alert("授權失敗！密碼錯誤。"); 
+    }
 }
 
 function handleCommand(manual) {
@@ -183,7 +187,6 @@ function render() {
     container.innerHTML = '';
     const now = new Date();
     const today = now.getDay() === 0 ? 7 : now.getDay();
-    const weekMap = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
     if(bosses.length === 0) return;
     let sorted = bosses.map(b => {
         let sortTime = 9999999999999, isOffDay = false, displayTime = "未記錄", countdownText = "下次重生：", isWarn = false;
