@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛡️ 絕密：天堂W王團秘書 - 管理員版</title>
+    <title>🛡️ 絕密：天堂W王團秘書 - 管理員專業版</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
         #mainContent { display: none; }
@@ -33,6 +34,9 @@
         .log-item { border-bottom: 1px solid #222; margin-bottom: 4px; padding-bottom: 2px; }
         .log-user { color: #4da6ff; font-weight: bold; }
         .log-action { color: #ffca2c; }
+        .modal-content { background-color: #1e1e1e; color: #eee; border: 1px solid #444; }
+        .modal-header { border-bottom: 1px solid #333; }
+        .modal-footer { border-top: 1px solid #333; }
     </style>
 </head>
 <body>
@@ -59,18 +63,37 @@
             <button class="btn btn-outline-danger btn-sm m-1" onclick="resetData()">🛠️ 管理員重置</button>
             <span id="syncStatus" class="badge bg-secondary ms-2">等待授權...</span>
         </div>
+        
         <div class="mt-3">
             <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="label-text">📋 最近 10 筆操作紀錄</span>
-                <button class="btn btn-link btn-sm p-0 text-secondary" onclick="clearMyIdentity()">修改代號</button>
+                <span class="label-text">📋 最近 10 筆紀錄</span>
+                <div>
+                    <button class="btn btn-link btn-sm p-0 text-secondary me-2" style="text-decoration:none;" onclick="openFullLogs()">👁️ 查看完整日誌</button>
+                    <button class="btn btn-link btn-sm p-0 text-info" style="text-decoration:none;" onclick="clearMyIdentity()">👤 修改代號</button>
+                </div>
             </div>
-            <div id="logArea">正在加載日誌...</div>
+            <div id="logArea">正在讀取...</div>
         </div>
+        
         <div class="mt-2 text-center">
-            <button class="btn btn-dark btn-sm" style="font-size: 0.6rem;" onclick="logout()">安全登出 (需重新輸入密碼)</button>
+            <button class="btn btn-dark btn-sm" style="font-size: 0.6rem;" onclick="logout()">安全登出</button>
         </div>
     </div>
     <div id="bossContainer" class="row g-2"></div>
+</div>
+
+<div class="modal fade" id="logModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">📜 完整歷史操作紀錄 (100筆)</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="fullLogBody" style="font-family: monospace; font-size: 0.85rem;">
+        載入中...
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -105,32 +128,37 @@ function startCloudAuth() {
         const userInput = prompt("請輸入今日團隊通行碼：");
         if (userInput === correctCode.toString()) {
             sessionStorage.setItem('isAuthorized', 'true');
-            checkIdentity();
+            checkIdentity(true); // 首次登入檢查身分
             unlockApp();
-        } else if (userInput !== null) {
-            alert("通行碼錯誤！");
-        }
+        } else if (userInput !== null) { alert("通行碼錯誤！"); }
     });
 }
 
-function checkIdentity() {
+function checkIdentity(isFirstLogin) {
     if (!myName) {
-        myName = prompt("請輸入您的稱呼 (用於日誌顯示，例如：小明)：");
-        if (!myName) myName = "無名英雄";
+        myName = prompt("請輸入您的代號 (用於日誌追蹤，例如：小明)：");
+        if (!myName) myName = "匿名玩家" + Math.floor(Math.random()*1000);
         localStorage.setItem('userName', myName);
+        if(!isFirstLogin) addLog(`已將代號修改為 [${myName}]`);
     }
 }
 
 function clearMyIdentity() {
-    localStorage.removeItem('userName');
-    location.reload();
+    const oldName = myName;
+    const newName = prompt("請輸入新的代號：", oldName);
+    if (newName && newName !== oldName) {
+        myName = newName;
+        localStorage.setItem('userName', myName);
+        addLog(`已將代號由 [${oldName}] 修改為 [${newName}]`);
+        alert("代號更新成功！");
+        location.reload();
+    }
 }
 
 function unlockApp() {
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
     
-    // 監聽王表數據
     dataRef.on('value', (snapshot) => {
         const data = snapshot.val();
         if (data && data.length > 0) {
@@ -141,7 +169,6 @@ function unlockApp() {
         }
     });
 
-    // 監聽日誌 (只抓最後 10 筆)
     logRef.limitToLast(10).on('value', (snapshot) => {
         const logArea = document.getElementById('logArea');
         logArea.innerHTML = '';
@@ -164,6 +191,30 @@ function addLog(msg) {
     });
 }
 
+function openFullLogs() {
+    const now = new Date();
+    const password = (now.getFullYear() - (now.getMonth() + 1) - now.getDate()).toString();
+    const userInput = prompt("⚠️ 歷史日誌受管理員保護，請輸入密碼：");
+    
+    if (userInput === password) {
+        logRef.limitToLast(100).once('value').then((snapshot) => {
+            const body = document.getElementById('fullLogBody');
+            body.innerHTML = '';
+            const logs = [];
+            snapshot.forEach(child => { logs.unshift(child.val()); });
+            logs.forEach(log => {
+                body.innerHTML += `<div class="pb-1 border-bottom border-secondary mb-1">
+                    <span class="text-secondary">[${log.time}]</span> 
+                    <span class="text-info font-weight-bold">${log.user}</span>: 
+                    <span class="text-warning">${log.msg}</span>
+                </div>`;
+            });
+            const myModal = new bootstrap.Modal(document.getElementById('logModal'));
+            myModal.show();
+        });
+    } else if (userInput !== null) { alert("授權碼錯誤，無法查看！"); }
+}
+
 function logout() {
     sessionStorage.removeItem('isAuthorized');
     location.reload();
@@ -179,12 +230,12 @@ function quickFill(n) {
 function resetData() {
     const now = new Date();
     const password = (now.getFullYear() - (now.getMonth() + 1) - now.getDate()).toString();
-    const userInput = prompt("請輸入管理員授權碼：");
+    const userInput = prompt("請輸入管理員授權碼進行重置：");
     if (userInput === password) {
-        if(confirm("確定重置所有數據？")) {
+        if(confirm("警告：這將清空所有王怪重生紀錄，確定？")) {
             bosses = getInitialData();
             dataRef.set(bosses);
-            addLog("執行了 [全數據重置]");
+            addLog("!! 執行了全數據重置 !!");
         }
     } else if (userInput !== null) { alert("密碼錯誤！"); }
 }
@@ -211,18 +262,14 @@ function handleCommand(manual) {
     } else {
         let tMatch = input.match(/\d{4}/);
         let namePart = input.replace(/\d{4}/, "").trim();
-        
         if(tMatch && namePart) {
             const tStr = tMatch[0];
-            // --- 防呆機制開始 ---
             const hh = parseInt(tStr.substring(0,2));
             const mm = parseInt(tStr.substring(2,4));
             if (hh > 23 || mm > 59) {
-                alert(`⚠️ 時間格式錯誤：${tStr}\n小時不可超過 23，分鐘不可超過 59！`);
+                alert(`⚠️ 錯誤：[${tStr}] 不是有效的時間。小時須為 00-23，分鐘須為 00-59。`);
                 return;
             }
-            // --- 防呆機制結束 ---
-
             const b = bosses.find(x => 
                 (x.name && (x.name.includes(namePart) || namePart.includes(x.name))) || 
                 (x.alias && x.alias.split(',').some(a => namePart.includes(a) || a.includes(namePart)))
@@ -234,17 +281,11 @@ function handleCommand(manual) {
                 b.lastDeath = d.getTime();
                 b.spawn = b.lastDeath + (b.cd * 3600000);
                 needUpdate = true;
-                logMsg = `修改了 [${b.name}] 時間為 ${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}`;
-            } else {
-                alert("找不到對應的王怪名稱！");
-            }
+                logMsg = `更新 [${b.name}] 為 ${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}`;
+            } else { alert("找不到王怪名稱，請檢查輸入。"); }
         }
     }
-
-    if(needUpdate) {
-        dataRef.set(bosses);
-        addLog(logMsg);
-    }
+    if(needUpdate) { dataRef.set(bosses); addLog(logMsg); }
 }
 
 function getInitialData() {
