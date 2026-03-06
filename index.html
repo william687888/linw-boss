@@ -93,10 +93,10 @@ function resetData() {
     const Y = now.getFullYear();
     const M = now.getMonth() + 1;
     const D = now.getDate();
-    // 密碼邏輯保持為 年-月-日
-    const correctPassword = Y + "-" + M + "-" + D;
+    
+    // 關鍵修正：確保 correctPassword 是純文字串接，不會變成減法運算
+    const correctPassword = `${Y}-${M}-${D}`;
 
-    // 移除所有格式提示，回歸純粹的輸入框
     const userInput = prompt("請輸入管理員授權碼：");
     if (userInput === correctPassword) {
         if(confirm("授權成功。警告：這將會清除所有重生紀錄，確定執行？")) { bosses = getInitialData(); saveToCloud(); }
