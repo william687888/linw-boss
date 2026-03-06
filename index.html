@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛡️ 絕密：天堂W王團秘書</title>
+    <title>🛡️ 絕密：天堂W王團秘書 - 管理員版</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -11,7 +11,6 @@
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
         #mainContent { display: none; }
         #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
-        
         .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; transition: 0.1s; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .card:active { transform: scale(0.96); background-color: #333; }
         .boss-name { font-size: 1.05rem; font-weight: bold; pointer-events: none; }
@@ -27,9 +26,13 @@
         #cmd { background-color: #2a2a2a; color: #fff; border: 1px solid #ffca2c; font-weight: bold; font-size: 1.1rem; }
         .badge-fixed { background-color: #0d6efd; padding: 4px 8px; font-size: 0.75rem; }
         .badge-cd { background-color: #6c757d; padding: 4px 8px; font-size: 0.75rem; }
-        .alias-text { font-size: 0.75rem; color: #888; margin-bottom: 5px; pointer-events: none; }
         .info-row { border-top: 1px solid #333; margin-top: auto; padding-top: 8px; pointer-events: none; }
         .label-text { font-size: 0.75rem; color: #aaa; }
+        /* 日誌風格 */
+        #logArea { font-size: 0.8rem; background: #000; color: #aaa; border: 1px solid #444; border-radius: 8px; height: 150px; overflow-y: auto; padding: 10px; }
+        .log-item { border-bottom: 1px solid #222; margin-bottom: 4px; padding-bottom: 2px; }
+        .log-user { color: #4da6ff; font-weight: bold; }
+        .log-action { color: #ffca2c; }
     </style>
 </head>
 <body>
@@ -38,7 +41,7 @@
     <div class="text-center p-4">
         <h3 class="mb-4">🔒 團隊私人頻道</h3>
         <button class="btn btn-gold px-5 py-2 mb-3" onclick="startCloudAuth()">點擊解鎖王表</button>
-        <p class="text-secondary" style="font-size: 0.85rem;">請向管理員索取今日通行碼<br>關閉網頁後權限將自動收回</p>
+        <p class="text-secondary" style="font-size: 0.85rem;">請向管理員索取今日通行碼</p>
     </div>
 </div>
 
@@ -47,7 +50,7 @@
     
     <div class="card p-3 mb-4 shadow" style="cursor: default;">
         <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="點擊下方王名，再輸入時間" onkeypress="if(event.keyCode==13) handleCommand()">
+            <input type="text" id="cmd" class="form-control" placeholder="點擊下方王卡，再輸入時間" onkeypress="if(event.keyCode==13) handleCommand()">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
         <div class="mt-2 text-center">
@@ -55,7 +58,16 @@
             <button class="btn btn-outline-secondary btn-sm m-1" onclick="handleCommand('CD恢復')">🔄 CD恢復</button>
             <button class="btn btn-outline-danger btn-sm m-1" onclick="resetData()">🛠️ 管理員重置</button>
             <span id="syncStatus" class="badge bg-secondary ms-2">等待授權...</span>
-            <button class="btn btn-dark btn-sm ms-2" style="font-size: 0.6rem;" onclick="logout()">安全登出</button>
+        </div>
+        <div class="mt-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="label-text">📋 最近 10 筆操作紀錄</span>
+                <button class="btn btn-link btn-sm p-0 text-secondary" onclick="clearMyIdentity()">修改代號</button>
+            </div>
+            <div id="logArea">正在加載日誌...</div>
+        </div>
+        <div class="mt-2 text-center">
+            <button class="btn btn-dark btn-sm" style="font-size: 0.6rem;" onclick="logout()">安全登出 (需重新輸入密碼)</button>
         </div>
     </div>
     <div id="bossContainer" class="row g-2"></div>
@@ -76,8 +88,10 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
 const authRef = db.ref('bossData/TEAM_AUTH_CODE');
+const logRef = db.ref('bossData/bossLogs');
 
 let bosses = [];
+let myName = localStorage.getItem('userName') || "";
 
 document.addEventListener("DOMContentLoaded", () => {
     if (sessionStorage.getItem('isAuthorized') === 'true') {
@@ -91,6 +105,7 @@ function startCloudAuth() {
         const userInput = prompt("請輸入今日團隊通行碼：");
         if (userInput === correctCode.toString()) {
             sessionStorage.setItem('isAuthorized', 'true');
+            checkIdentity();
             unlockApp();
         } else if (userInput !== null) {
             alert("通行碼錯誤！");
@@ -98,9 +113,24 @@ function startCloudAuth() {
     });
 }
 
+function checkIdentity() {
+    if (!myName) {
+        myName = prompt("請輸入您的稱呼 (用於日誌顯示，例如：小明)：");
+        if (!myName) myName = "無名英雄";
+        localStorage.setItem('userName', myName);
+    }
+}
+
+function clearMyIdentity() {
+    localStorage.removeItem('userName');
+    location.reload();
+}
+
 function unlockApp() {
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
+    
+    // 監聽王表數據
     dataRef.on('value', (snapshot) => {
         const data = snapshot.val();
         if (data && data.length > 0) {
@@ -109,6 +139,28 @@ function unlockApp() {
             const s = document.getElementById('syncStatus');
             if(s) { s.innerText = "秘書同步中"; s.className = "badge ms-2 bg-success"; }
         }
+    });
+
+    // 監聽日誌 (只抓最後 10 筆)
+    logRef.limitToLast(10).on('value', (snapshot) => {
+        const logArea = document.getElementById('logArea');
+        logArea.innerHTML = '';
+        const logs = [];
+        snapshot.forEach(child => { logs.unshift(child.val()); });
+        logs.forEach(log => {
+            logArea.innerHTML += `<div class="log-item">[${log.time}] <span class="log-user">${log.user}</span>: <span class="log-action">${log.msg}</span></div>`;
+        });
+    });
+}
+
+function addLog(msg) {
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+    logRef.push({
+        time: timeStr,
+        user: myName,
+        msg: msg,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
     });
 }
 
@@ -121,28 +173,20 @@ function quickFill(n) {
     const cmdInput = document.getElementById('cmd');
     cmdInput.value = n;
     cmdInput.focus();
-    // 核心修正：將游標強制移至王名前方 (位置 0)
-    setTimeout(() => {
-        cmdInput.setSelectionRange(0, 0);
-    }, 10);
+    setTimeout(() => { cmdInput.setSelectionRange(0, 0); }, 10);
 }
 
 function resetData() {
     const now = new Date();
-    const Y = now.getFullYear();
-    const M = now.getMonth() + 1;
-    const D = now.getDate();
-    const correctPassword = (Y - M - D).toString();
-
+    const password = (now.getFullYear() - (now.getMonth() + 1) - now.getDate()).toString();
     const userInput = prompt("請輸入管理員授權碼：");
-    if (userInput === correctPassword) {
-        if(confirm("確定清空所有紀錄？")) {
+    if (userInput === password) {
+        if(confirm("確定重置所有數據？")) {
             bosses = getInitialData();
-            db.ref('bossData/SECRETARY_PRO_DATA').set(bosses);
+            dataRef.set(bosses);
+            addLog("執行了 [全數據重置]");
         }
-    } else if (userInput !== null) { 
-        alert("管理員密碼錯誤！"); 
-    }
+    } else if (userInput !== null) { alert("密碼錯誤！"); }
 }
 
 function handleCommand(manual) {
@@ -150,7 +194,9 @@ function handleCommand(manual) {
     const input = (manual || cmdInput.value).trim();
     cmdInput.value = '';
     if(!input) return;
+
     let needUpdate = false;
+    let logMsg = "";
 
     if (input === "CD減半" || input === "CD恢復") {
         const isHalf = input === "CD減半";
@@ -161,26 +207,44 @@ function handleCommand(manual) {
             } 
         });
         needUpdate = true;
+        logMsg = `執行了 [${input}]`;
     } else {
         let tMatch = input.match(/\d{4}/);
         let namePart = input.replace(/\d{4}/, "").trim();
+        
         if(tMatch && namePart) {
             const tStr = tMatch[0];
+            // --- 防呆機制開始 ---
+            const hh = parseInt(tStr.substring(0,2));
+            const mm = parseInt(tStr.substring(2,4));
+            if (hh > 23 || mm > 59) {
+                alert(`⚠️ 時間格式錯誤：${tStr}\n小時不可超過 23，分鐘不可超過 59！`);
+                return;
+            }
+            // --- 防呆機制結束 ---
+
             const b = bosses.find(x => 
                 (x.name && (x.name.includes(namePart) || namePart.includes(x.name))) || 
                 (x.alias && x.alias.split(',').some(a => namePart.includes(a) || a.includes(namePart)))
             );
             if(b && b.type==='cd') {
                 let d = new Date();
-                d.setHours(tStr.substring(0,2), tStr.substring(2,4), 0, 0);
+                d.setHours(hh, mm, 0, 0);
                 if(d > new Date()) d.setDate(d.getDate()-1);
                 b.lastDeath = d.getTime();
                 b.spawn = b.lastDeath + (b.cd * 3600000);
                 needUpdate = true;
+                logMsg = `修改了 [${b.name}] 時間為 ${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}`;
+            } else {
+                alert("找不到對應的王怪名稱！");
             }
         }
     }
-    if(needUpdate) db.ref('bossData/SECRETARY_PRO_DATA').set(bosses);
+
+    if(needUpdate) {
+        dataRef.set(bosses);
+        addLog(logMsg);
+    }
 }
 
 function getInitialData() {
