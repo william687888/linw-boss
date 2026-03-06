@@ -9,9 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
-        /* 預設隱藏所有主內容 */
         #mainContent { display: none; }
-        /* 登入遮罩層 */
         #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
         
         .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; transition: 0.1s; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -64,7 +62,6 @@
 </div>
 
 <script>
-// Firebase 配置
 const firebaseConfig = {
   apiKey: "AIzaSyAiPLZv4zBUDG3z2zQSnlt31K-IOoLW-Gs",
   authDomain: "mybosstimer.firebaseapp.com",
@@ -78,42 +75,32 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
-const authRef = db.ref('bossData/TEAM_AUTH_CODE'); // 指向妳剛剛建立的 9780 節點
+const authRef = db.ref('bossData/TEAM_AUTH_CODE');
 
 let bosses = [];
 
-// 頁面加載檢查
 document.addEventListener("DOMContentLoaded", () => {
     if (sessionStorage.getItem('isAuthorized') === 'true') {
         unlockApp();
     }
 });
 
-// 執行雲端驗證
 function startCloudAuth() {
     authRef.once('value').then((snapshot) => {
         const correctCode = snapshot.val();
-        if (!correctCode) {
-            alert("雲端尚未設定通行碼，請管理員至 Firebase 設定。");
-            return;
-        }
-
         const userInput = prompt("請輸入今日團隊通行碼：");
         if (userInput === correctCode.toString()) {
             sessionStorage.setItem('isAuthorized', 'true');
             unlockApp();
         } else if (userInput !== null) {
-            alert("通行碼錯誤，請確認後再試！");
+            alert("通行碼錯誤！");
         }
     });
 }
 
-// 解鎖並開始監聽數據
 function unlockApp() {
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
-    
-    // 通過驗證才啟動 Firebase 監聽
     dataRef.on('value', (snapshot) => {
         const data = snapshot.val();
         if (data && data.length > 0) {
@@ -125,13 +112,21 @@ function unlockApp() {
     });
 }
 
-// 安全登出（抹除會話）
 function logout() {
     sessionStorage.removeItem('isAuthorized');
     location.reload();
 }
 
-// 管理員重置：年-月-日
+function quickFill(n) { 
+    const cmdInput = document.getElementById('cmd');
+    cmdInput.value = n;
+    cmdInput.focus();
+    // 核心修正：將游標強制移至王名前方 (位置 0)
+    setTimeout(() => {
+        cmdInput.setSelectionRange(0, 0);
+    }, 10);
+}
+
 function resetData() {
     const now = new Date();
     const Y = now.getFullYear();
@@ -141,13 +136,12 @@ function resetData() {
 
     const userInput = prompt("請輸入管理員授權碼：");
     if (userInput === correctPassword) {
-        if(confirm("授權成功。警告：這將會清除所有重生紀錄，確定執行？")) {
+        if(confirm("確定清空所有紀錄？")) {
             bosses = getInitialData();
             db.ref('bossData/SECRETARY_PRO_DATA').set(bosses);
-            alert("已恢復至初始名單。");
         }
     } else if (userInput !== null) { 
-        alert("授權失敗！密碼錯誤。"); 
+        alert("管理員密碼錯誤！"); 
     }
 }
 
@@ -279,7 +273,6 @@ function render() {
             </div>`;
     });
 }
-function quickFill(n) { document.getElementById('cmd').value = n; document.getElementById('cmd').focus(); }
 setInterval(render, 30000); 
 </script>
 </body>
