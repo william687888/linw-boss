@@ -29,7 +29,10 @@
         .badge-cd { background-color: #6c757d; padding: 4px 8px; font-size: 0.75rem; }
         .info-row { border-top: 1px solid #333; margin-top: auto; padding-top: 8px; pointer-events: none; }
         .label-text { font-size: 0.75rem; color: #aaa; }
-        /* 日誌風格 */
+        
+        /* 優化別名顯示亮度 */
+        .alias-text { font-size: 0.8rem; color: #bbb; margin-bottom: 5px; pointer-events: none; font-weight: 500; }
+        
         #logArea { font-size: 0.8rem; background: #000; color: #aaa; border: 1px solid #444; border-radius: 8px; height: 150px; overflow-y: auto; padding: 10px; }
         .log-item { border-bottom: 1px solid #222; margin-bottom: 4px; padding-bottom: 2px; }
         .log-user { color: #4da6ff; font-weight: bold; }
@@ -128,7 +131,7 @@ function startCloudAuth() {
         const userInput = prompt("請輸入今日團隊通行碼：");
         if (userInput === correctCode.toString()) {
             sessionStorage.setItem('isAuthorized', 'true');
-            checkIdentity(true); // 首次登入檢查身分
+            checkIdentity(true);
             unlockApp();
         } else if (userInput !== null) { alert("通行碼錯誤！"); }
     });
@@ -136,7 +139,7 @@ function startCloudAuth() {
 
 function checkIdentity(isFirstLogin) {
     if (!myName) {
-        myName = prompt("請輸入您的代號 (用於日誌追蹤，例如：小明)：");
+        myName = prompt("請輸入您的代號 (例如：小明)：");
         if (!myName) myName = "匿名玩家" + Math.floor(Math.random()*1000);
         localStorage.setItem('userName', myName);
         if(!isFirstLogin) addLog(`已將代號修改為 [${myName}]`);
@@ -267,7 +270,7 @@ function handleCommand(manual) {
             const hh = parseInt(tStr.substring(0,2));
             const mm = parseInt(tStr.substring(2,4));
             if (hh > 23 || mm > 59) {
-                alert(`⚠️ 錯誤：[${tStr}] 不是有效的時間。小時須為 00-23，分鐘須為 00-59。`);
+                alert(`⚠️ 錯誤：[${tStr}] 格式無效。`);
                 return;
             }
             const b = bosses.find(x => 
@@ -282,7 +285,7 @@ function handleCommand(manual) {
                 b.spawn = b.lastDeath + (b.cd * 3600000);
                 needUpdate = true;
                 logMsg = `更新 [${b.name}] 為 ${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}`;
-            } else { alert("找不到王怪名稱，請檢查輸入。"); }
+            } else { alert("找不到王怪名稱。"); }
         }
     }
     if(needUpdate) { dataRef.set(bosses); addLog(logMsg); }
