@@ -2,82 +2,178 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛡️天堂W王團秘書翊達科技</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🛡️ 天堂W王團秘書 - 翊達科技</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
-        body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
-        #mainContent { display: none; }
-        #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
-        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; transition: 0.1s; cursor: pointer; -webkit-tap-highlight-color: transparent; min-height: 140px; display: flex; flex-direction: column; }
-        .card:active { transform: scale(0.96); background-color: #333; }
+        body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; }
+        #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        #mainContent { display: none; padding: 15px; }
         
-        /* 修正後的顏色代碼 CSS */
-        .color-default { color: #ffca2c !important; } /* 金黃 (預設) */
-        .color-purple { color: #bf40ff !important; }  /* 紫色 (固定) */
-        .color-red { color: #ff4d4d !important; }     /* 紅色 (8小時以上) */
-        .color-blue { color: #4da6ff !important; }    /* 藍色 (4小時以上) */
-        .color-gray { color: #aaaaaa !important; }    /* 灰色 (12小時以上) */
+        /* 核心顏色修正 */
+        .color-gold { color: #ffca2c !important; }
+        .color-purple { color: #bf40ff !important; }
+        .color-red { color: #ff4d4d !important; }
+        .color-blue { color: #4da6ff !important; }
+        .color-gray { color: #aaaaaa !important; }
 
-        .boss-name { font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; }
-        .countdown { font-size: 1.3rem; font-family: 'Segoe UI', monospace; color: #00ff00; font-weight: bold; }
-        .warning { background-color: #4a0000 !important; border-color: #ff0000; animation: blinker 1.5s linear infinite; }
-        @keyframes blinker { 50% { opacity: 0.7; } }
-        
-        .btn-gold { background-color: #ffca2c; color: #000; font-weight: bold; border: none; }
-        #cmd { background-color: #2a2a2a; color: #fff; border: 1px solid #ffca2c; font-weight: bold; }
-        .badge-fixed { background-color: #0d6efd; padding: 4px 8px; font-size: 0.75rem; }
-        .badge-cd { background-color: #6c757d; padding: 4px 8px; font-size: 0.75rem; }
-        .info-row { border-top: 1px solid #333; margin-top: auto; padding-top: 8px; }
-        .label-text { font-size: 0.75rem; color: #aaa; }
-        .alias-text { font-size: 0.8rem; color: #bbb; margin-bottom: 5px; font-weight: 500; }
-        #logArea { font-size: 0.8rem; background: #000; color: #aaa; border: 1px solid #444; border-radius: 8px; height: 120px; overflow-y: auto; padding: 10px; }
-        .modal-content { background-color: #1e1e1e; color: #eee; border: 1px solid #444; }
+        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; margin-bottom: 10px; }
+        .boss-name { font-size: 1.1rem; font-weight: bold; }
+        .countdown { font-size: 1.4rem; color: #00ff00; font-weight: bold; font-family: monospace; }
+        .alias-text { color: #888; font-size: 0.85rem; }
+        #logArea { font-size: 0.8rem; background: #000; color: #888; height: 100px; overflow-y: auto; padding: 8px; border-radius: 5px; }
+        .btn-gold { background-color: #ffca2c; color: #000; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="authOverlay">
-    <div class="text-center p-4">
-        <h3 class="mb-4">🔒 團隊私人頻道</h3>
-        <button class="btn btn-gold px-5 py-2 mb-3" onclick="startCloudAuth()">點擊解鎖王表</button>
-    </div>
+    <button class="btn btn-gold btn-lg" onclick="verifyAccess()">🔓 解鎖王表</button>
 </div>
 
-<div id="mainContent" class="container py-4">
-    <h3 class="text-center mb-4">🛡️天堂W王團秘書</h3>
+<div id="mainContent">
+    <h4 class="text-center mb-3">🛡️ 天堂W王團秘書</h4>
     
-    <div class="card p-3 mb-4 shadow" style="cursor: default; min-height: auto;">
-        <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="輸入 [王名+時間] 例如: 巨鱷1230">
+    <div class="card p-3 mb-3">
+        <div class="input-group mb-2">
+            <input type="text" id="cmd" class="form-control bg-dark text-white" placeholder="輸入：巨鱷1230">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
-        <div class="mt-2 text-center">
-            <button class="btn btn-outline-warning btn-sm m-1" onclick="handleCommand('CD減半')">⚡ CD減半</button>
-            <button class="btn btn-outline-secondary btn-sm m-1" onclick="handleCommand('CD恢復')">🔄 CD恢復</button>
-            <button class="btn btn-outline-danger btn-sm m-1" onclick="resetData()">🛠️ 管理員重置</button>
-            <span id="syncStatus" class="badge bg-secondary ms-2">同步中...</span>
-        </div>
-        <div id="logArea" class="mt-2">正在載入紀錄...</div>
+        <div id="logArea">正在載入紀錄...</div>
     </div>
 
     <div id="bossContainer" class="row g-2"></div>
 </div>
 
 <script>
-/* 修正後的加密代碼 */
-(function(_0x1b2c3d,_0x4e5f6a){const _0x123456=_0x7890;const _0xabc123=_0x1b2c3d();while(!![]){try{const _0xdeadbeef=parseInt(_0x123456(0x131))/0x1*(-parseInt(_0x123456(0x10e))/0x2)+-parseInt(_0x123456(0x103))/0x3+-parseInt(_0x123456(0x100))/0x4+-parseInt(_0x123456(0xe2))/0x5*(-parseInt(_0x123456(0x11c))/0x6)+parseInt(_0x123456(0xca))/0x7*(-parseInt(_0x123456(0x140))/0x8)+-parseInt(_0x123456(0x161))/0x9*(-parseInt(_0x123456(0x12b))/0xa)+-parseInt(_0x123456(0xec))/0xb*(-parseInt(_0x123456(0x170))/0xc);if(_0xdeadbeef===_0x4e5f6a)break;else _0xabc123['push'](_0xabc123['shift']());}catch(_0xerr){_0xabc123['push'](_0xabc123['shift']());}}}(_0x3456,0x646a2));
+// --- 安全保護與網域檢查 ---
+const _0x1a2b = ['william687888.github.io', 'location', 'hostname', 'body', 'innerHTML'];
+if (window[_0x1a2b[1]][_0x1a2b[2]] !== _0x1a2b[0]) {
+    document[_0x1a2b[3]][_0x1a2b[4]] = 'Unauthorized Access';
+}
 
-function _0x7890(_0xid,_0xopt){const _0xlist=_0x3456();return _0xlist[_0xid-0xc0];}
+// --- Firebase 配置 ---
+const firebaseConfig = {
+    apiKey: "AIzaSyAiPLZv4zBUDG3z2zQSnlt31K-IOoLW-Gs",
+    authDomain: "mybosstimer.firebaseapp.com",
+    databaseURL: "https://mybosstimer-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "mybosstimer",
+    appId: "1:43002364713:web:8a19b0c5eb5eae4d3b6d38"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-function _0x3456(){const _0xdata=['請輸入新的代號：','阿爾斯卡利亞','off-day','更新\x20[','forEach','ref','<div\x20class=\x22log-item\x22>','logModal','ServerValue','43002364713','weekday','龍2,飛龍2','652926vEwfXl','夏斯奇','19:00','database','badge-cd','time','01:00','bossData/TEAM_AUTH_CODE','getFullYear','sort','getDay','sortTime','true','substring','includes','10qHAVkJ','已將代號修改為\x20[','23:00','03:00','push','lastDeath','1kaOToD','</div>','show','times','</div><div\x20class=\x22countdown\x22>','padStart','getMonth','已攔截非法執行','resetData','卡爾迪修','fixed','disp','isAuthorized','</span>\x20<span\x20class=\x22log-user\x22>','小莫,莫利提亞','121864dSocsd','下次重生：','09:00','❗確定清空所有王怪時間並抹除紀錄？','\x27)\x22><div\x20class=\x22d-flex\x20justify-content-between\x22><div\x20class=\x22boss-name\x20text-truncate\x20','setHours','limitToLast','setDate','05:00','warning','</div>','剩餘\x20','length','bossData/bossLogs','烏勒庫斯','cmd','奈克,阿吐巴','⚠\x20執行了系統重置\x20⚠','startCloudAuth','setItem','clearMyIdentity','11:00','isOff','cdText','17:00','color-purple','user','getTime','mybosstimer','handleCommand','innerHTML','badge-fixed','頭目哈格碼','1025847JilPYV','mybosstimer.firebaseapp.com','map','阿勒尼亞','黑虎恰姆帕瓦特','TIMESTAMP','origCd','trim','Modal','some','spawn','location','數據已清空','reload','</span></div><div\x20class=\x22alias-text\x20text-truncate\x22>','12WroFzm','fullLogBody','執行了\x20[','type','msg','getHours','split','onload','龍4,飛龍4','alias','黑色亡靈萊奧斯','飛龍2區','海賊,海賊王','龍3,飛龍3','已重生！','147cLJBry','then','apps','21:00','unshift','removeItem','卡司特王','floor','17:30','set','once','CD減半','toString','15:00','拒絕訪問','奈克偌斯','none','請輸入您的代號\x20(例如：阿達)：','logout','getDate','巨人王','william687888.github.io','value','查無此王','5VlCVHc','蜥蜴,蜥蜴王','syncStatus','拉馬修,蛇女','authOverlay','color-blue','find','</span></div>',']\x20修改為\x20[','<div\x20class=\x22col-6\x20col-md-4\x20col-lg-3\x22><div\x20class=\x22card\x20p-2\x20','14466188zDkdpg','mybosstimer.firebasestorage.app','style','鑽石高崙','bossContainer','[','尼羅德','getElementById','getMinutes','狼王,狼人','疾風的巨大飛龍','已將代號由\x20[','審判者拉馬修','史前巨鱷','\x22\x20onclick=\x22quickFill(\x27','1:43002364713:web:8a19b0c5eb5eae4d3b6d38','block','管理授權驗證：','18:20','13:00','921988geaZNo','hostname','name','1527987YrDcNF','</span>:\x20','className','innerText','船長卡利索','未記錄','val','巨鱷,鱷魚','</div></div></div></div>','飛龍4區','getItem','133790AQwPVr','秘書同步中','color-red','color-gray'];return _0xdata;}
+let bossData = [];
+let userName = localStorage.getItem('userName') || '';
 
-/* 核心初始化與修復後的渲染邏輯 */
-(function(){const _0x123=_0x7890;const _0xdomain=_0x123(0xdf);if(window['location'][_0x123(0x101)]!==_0xdomain){document['body']['innerHTML']='<h1>Unauthorized</h1>';return;}const _0xconfig={'apiKey':'AIzaSyAiPLZv4zBUDG3z2zQSnlt31K-IOoLW-Gs','authDomain':_0x123(0x162),'databaseURL':'https://mybosstimer-default-rtdb.asia-southeast1.firebasedatabase.app','projectId':_0x123(0x15c),'storageBucket':_0x123(0xed),'messagingSenderId':_0x123(0x119),'appId':_0x123(0xfb)};!firebase[_0x123(0xcc)]['length']&&firebase['initializeApp'](_0xconfig);const _0xdb=firebase[_0x123(0x11f)]();const _0xref=_0xdb[_0x123(0x115)]('bossData/SECRETARY_PRO_DATA');const _0xauthRef=_0xdb[_0x123(0x115)](_0x123(0x123));const _0xlogRef=_0xdb['ref'](_0x123(0x14d));let _0xdata=[];let _0xuser=localStorage[_0x123(0x10d)]('userName')||'';window[_0x123(0x152)]=function(){_0xauthRef[_0x123(0xd4)]('value')[_0x123(0xcb)](snap=>{const _0xpw=snap['val']();const _0xin=prompt('請輸入今日通行碼：');if(_0xin===_0xpw[_0x123(0xd6)]()){sessionStorage[_0x123(0x153)](_0x123(0x13d),_0x123(0x128));_0xinitApp();}else{alert('錯誤！');}});};function _0xinitApp(){document[_0x123(0xf3)](_0x123(0xe6))[_0x123(0xee)]['display']=_0x123(0xda);document[_0x123(0xf3)]('mainContent')[_0x123(0xee)]['display']=_0x123(0xfc);if(!_0xuser){_0xuser=prompt('請輸入你的代號：')||'成員';localStorage[_0x123(0x153)]('userName',_0xuser);}_0xref['on']('value',snap=>{_0xdata=snap['val']()||[];_0xrender();document[_0x123(0xf3)](_0x123(0xe4))[_0x123(0x105)]='badge\x20bg-success';});_0xlogRef[_0x123(0x146)](10)['on']('value',snap=>{const _0xlogArea=document[_0x123(0xf3)]('logArea');_0xlogArea['innerHTML']='';snap['forEach'](child=>{const _0xl=child['val']();_0xlogArea['innerHTML']+=`<div>[${_0xl.time}] <b>${_0xl.user}</b>: ${_0xl.msg}</div>`;});});}function _0xrender(){const _0xcont=document[_0x123(0xf3)](_0x123(0xf0));if(!_0xcont)return;_0xcont['innerHTML']='';const _0xnow=new Date();let _0xlist=_0xdata['map'](b=>{let _0xcls='color-default';let _0xdisp='--:--';let _0xcdT='待機中';if(b['type']==='fixed'){_0xcls='color-purple';_0xdisp=b.times[0];}else{if(b['cd']>=12)_0xcls='color-gray';else if(b['cd']>=8)_0xcls='color-red';else if(b['cd']>=4)_0xcls='color-blue';if(b['spawn']){const _0xd=new Date(b['spawn']);_0xdisp=_0xd['getHours']().toString().padStart(2,'0')+':'+_0xd['getMinutes']().toString().padStart(2,'0');const _0xleft=Math.floor((b['spawn']-_0xnow.getTime())/60000);_0xcdT=_0xleft<=0?'已重生':`剩餘 ${Math.floor(_0xleft/60)}時${_0xleft%60}分`;}}return {...b, _cls:_0xcls, _disp:_0xdisp, _cdT:_0xcdT};});_0xlist['sort']((a,b)=>(a['spawn']||0)-(b['spawn']||0));_0xlist['forEach'](b=>{_0xcont['innerHTML']+=`<div class="col-6 col-md-4 col-lg-3"><div class="card p-2" onclick="quickFill('${b.name}')"><div class="d-flex justify-content-between"><div class="boss-name text-truncate ${b._cls}">${b.name}</div><span class="badge ${b.type==='fixed'?'badge-fixed':'badge-cd'}">${b.type==='fixed'?'固定':'CD '+b.cd+'h'}</span></div><div class="alias-text text-truncate">${b.alias||''}</div><div class="info-row"><div class="label-text">下次重生：</div><div class="countdown">${b._disp}</div><div class="label-text" style="color:#00ff00">${b._cdT}</div></div></div></div>`;});}window['handleCommand']=function(_0xcmdIn){const _0xin=document[_0x123(0xf3)]('cmd');const _0xval=_0xcmdIn||_0xin['value'];if(!_0xval)return;_0xin['value']='';/* 這裡省略複雜指令解析以節省篇幅，確保核心功能運作 */
-const _0xlog={time:new Date().getHours()+':'+new Date().getMinutes(),user:_0xuser,msg:'執行了 ['+_0xval+']'};_0xlogRef['push'](_0xlog);};window['quickFill']=function(n){const _0xi=document[_0x123(0xf3)]('cmd');_0xi['value']=n;_0xi['focus']();};window['resetData']=function(){if(confirm('確定重置？')){_0xref['set'](_0xdata);alert('已重置');}};window['startCloudAuth']=window[_0x123(0x152)];}());
+async function verifyAccess() {
+    const snap = await db.ref('bossData/TEAM_AUTH_CODE').once('value');
+    const correctCode = snap.val();
+    const input = prompt('請輸入團隊代號：');
+    
+    if (input === String(correctCode)) {
+        document.getElementById('authOverlay').style.display = 'none';
+        document.getElementById('mainContent').style.display = 'block';
+        initApp();
+    } else {
+        alert('代碼錯誤！');
+    }
+}
+
+function initApp() {
+    if (!userName) {
+        userName = prompt('請輸入您的稱呼：') || '成員';
+        localStorage.setItem('userName', userName);
+    }
+
+    // 監聽王怪數據
+    db.ref('bossData/SECRETARY_PRO_DATA').on('value', snap => {
+        bossData = snap.val() || [];
+        renderBosses();
+    });
+
+    // 監聽日誌
+    db.ref('bossData/bossLogs').limitToLast(10).on('value', snap => {
+        const logArea = document.getElementById('logArea');
+        logArea.innerHTML = '';
+        snap.forEach(child => {
+            const l = child.val();
+            logArea.innerHTML += `<div>[${l.time}] <b>${l.user}</b>: ${l.msg}</div>`;
+        });
+        logArea.scrollTop = logArea.scrollHeight;
+    });
+}
+
+function renderBosses() {
+    const container = document.getElementById('bossContainer');
+    container.innerHTML = '';
+    const now = new Date().getTime();
+
+    // 排序：重生時間近的排前面
+    const sorted = [...bossData].sort((a, b) => (a.spawn || 0) - (b.spawn || 0));
+
+    sorted.forEach(boss => {
+        let colorClass = 'color-gold';
+        let timeDisp = '--:--';
+        let countdownText = '等待中';
+
+        if (boss.type === 'fixed') {
+            colorClass = 'color-purple';
+            timeDisp = boss.times ? boss.times[0] : '固定';
+        } else if (boss.spawn) {
+            // 判斷顏色
+            if (boss.cd >= 12) colorClass = 'color-gray';
+            else if (boss.cd >= 8) colorClass = 'color-red';
+            else if (boss.cd >= 4) colorClass = 'color-blue';
+
+            const d = new Date(boss.spawn);
+            timeDisp = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+            
+            const diff = Math.floor((boss.spawn - now) / 60000);
+            countdownText = diff <= 0 ? '已重生！' : `剩餘 ${Math.floor(diff/60)}時${diff%60}分`;
+        }
+
+        const html = `
+            <div class="col-6 col-md-4">
+                <div class="card p-2" onclick="quickFill('${boss.name}')">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="boss-name ${colorClass}">${boss.name}</div>
+                        <span class="badge ${boss.type==='fixed'?'bg-primary':'bg-secondary'}" style="font-size:0.6rem">
+                            ${boss.type==='fixed'?'固定': boss.cd+'H'}
+                        </span>
+                    </div>
+                    <div class="alias-text text-truncate">${boss.alias || ''}</div>
+                    <div class="mt-2">
+                        <div style="font-size:0.7rem; color:#666">下次重生：</div>
+                        <div class="countdown">${timeDisp}</div>
+                        <div style="font-size:0.75rem; color:#00ff00">${countdownText}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.innerHTML += html;
+    });
+}
+
+function quickFill(name) {
+    document.getElementById('cmd').value = name;
+    document.getElementById('cmd').focus();
+}
+
+function handleCommand() {
+    const input = document.getElementById('cmd');
+    const val = input.value.trim();
+    if (!val) return;
+
+    db.ref('bossData/bossLogs').push({
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        user: userName,
+        msg: `執行了 [${val}]`
+    });
+    input.value = '';
+}
 </script>
 
 </body>
