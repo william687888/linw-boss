@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛡️天堂W王團秘書</title>
+    <title>🛡️ 天堂W王團秘書</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -21,18 +21,43 @@
         .color-blue { color: #4da6ff; }
         .countdown { font-size: 1.3rem; font-family: 'Segoe UI', monospace; color: #00ff00; font-weight: bold; pointer-events: none; }
         .warning { background-color: #4a0000 !important; border-color: #ff0000; animation: blinker 1.5s linear infinite; }
+        .off-day { opacity: 0.3; filter: grayscale(1); }
         @keyframes blinker { 50% { opacity: 0.7; } }
         .btn-gold { background-color: #ffca2c; color: #000; font-weight: bold; border: none; }
         #cmd { background-color: #2a2a2a; color: #fff; border: 1px solid #ffca2c; font-weight: bold; font-size: 1.1rem; }
+        .badge-fixed { background-color: #0d6efd; padding: 4px 8px; font-size: 0.75rem; }
+        .badge-cd { background-color: #6c757d; padding: 4px 8px; font-size: 0.75rem; }
+        .info-row { border-top: 1px solid #333; margin-top: auto; padding-top: 8px; pointer-events: none; }
         .label-text { font-size: 0.75rem; color: #aaa; }
         .alias-text { font-size: 0.8rem; color: #bbb; margin-bottom: 5px; pointer-events: none; font-weight: 500; }
         #logArea { font-size: 0.8rem; background: #000; color: #aaa; border: 1px solid #444; border-radius: 8px; height: 150px; overflow-y: auto; padding: 10px; }
         .log-item { border-bottom: 1px solid #222; margin-bottom: 4px; padding-bottom: 2px; }
         .log-user { color: #4da6ff; font-weight: bold; }
         .log-action { color: #ffca2c; }
+        .modal-content { background-color: #1e1e1e; color: #eee; border: 1px solid #444; }
+        .modal-header { border-bottom: 1px solid #333; }
+        .modal-footer { border-top: 1px solid #333; }
     </style>
 </head>
 <body>
+
+<script>
+    (function() {
+        const allowedHost = "william687888.github.io"; // 妳的 GitHub 網域
+        const currentHost = window.location.hostname;
+        // 允許 GitHub 網域、本機 127.0.0.1 以及 localhost
+        if (currentHost !== allowedHost && currentHost !== "127.0.0.1" && currentHost !== "localhost") {
+            document.body.innerHTML = `
+                <div style="background:#000;color:red;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;">
+                    <h1>⚠️ 未經授權的網域</h1>
+                    <p>Unauthorized Domain Access</p>
+                    <p style="color:#aaa;">此程式由【翊達科技】開發，禁止非授權轉載盜用。</p>
+                </div>`;
+            window.stop(); 
+            throw new Error("Unauthorized Access");
+        }
+    })();
+</script>
 
 <div id="authOverlay">
     <div class="text-center p-4">
@@ -47,30 +72,335 @@
     
     <div class="card p-3 mb-4 shadow" style="cursor: default;">
         <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="輸入 [名稱 時間] 或點擊卡片" onkeypress="if(event.keyCode==13) handleCommand()">
+            <input type="text" id="cmd" class="form-control" placeholder="點擊下方王卡，再輸入時間" onkeypress="if(event.keyCode==13) handleCommand()">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
         <div class="mt-2 text-center">
             <button class="btn btn-outline-warning btn-sm m-1" onclick="handleCommand('CD減半')">⚡ CD減半</button>
             <button class="btn btn-outline-secondary btn-sm m-1" onclick="handleCommand('CD恢復')">🔄 CD恢復</button>
+            <button class="btn btn-outline-danger btn-sm m-1" onclick="resetData()">🛠️ 管理員重置</button>
             <span id="syncStatus" class="badge bg-secondary ms-2">等待授權...</span>
         </div>
         
         <div class="mt-3">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="label-text">📋 最近 10 筆紀錄</span>
-                <button class="btn btn-link btn-sm p-0 text-dark" style="text-decoration:none; font-size:0.7rem;" onclick="logout()">安全登出</button>
+                <div>
+                    <button class="btn btn-link btn-sm p-0 text-secondary me-2" style="text-decoration:none;" onclick="openFullLogs()">👁️ 查看完整日誌</button>
+                    <button class="btn btn-link btn-sm p-0 text-info" style="text-decoration:none;" onclick="clearMyIdentity()">👤 修改代號</button>
+                </div>
             </div>
             <div id="logArea">正在讀取...</div>
         </div>
+        
+        <div class="mt-2 text-center">
+            <button class="btn btn-dark btn-sm" style="font-size: 0.6rem;" onclick="logout()">安全登出</button>
+        </div>
     </div>
-    
     <div id="bossContainer" class="row g-2"></div>
 </div>
 
+<div class="modal fade" id="logModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">📜 完整歷史操作紀錄 (100筆)</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="fullLogBody" style="font-family: monospace; font-size: 0.85rem;">
+        載入中...
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-// 加密程式碼部分
-(function(_0x335ccf,_0x4bab93){const _0x45801f=_0x4d6a,_0x5319f2=_0x335ccf();while(!![]){try{const _0x1a605c=-parseInt(_0x45801f(0x1e0))/0x1*(parseInt(_0x45801f(0x1b1))/0x2)+-parseInt(_0x45801f(0x1c1))/0x3*(-parseInt(_0x45801f(0x1b4))/0x4)+parseInt(_0x45801f(0x1cc))/0x5+parseInt(_0x45801f(0x1e7))/0x6*(-parseInt(_0x45801f(0x1da))/0x7)+parseInt(_0x45801f(0x1ae))/0x8*(-parseInt(_0x45801f(0x1a7))/0x9)+-parseInt(_0x45801f(0x1db))/0xa*(-parseInt(_0x45801f(0x1bc))/0xb)+parseInt(_0x45801f(0x1e5))/0xc;if(_0x1a605c===_0x4bab93)break;else _0x5319f2['push'](_0x5319f2['shift']());}catch(_0x5c2a01){_0x5319f2['push'](_0x5319f2['shift']());}}}(_0x12bc,0x8a9a9),(function(){const _0x5d2a49=_0x4d6a,_0x1ed871=_0x5d2a49(0x1cd),_0x5a9bee=window[_0x5d2a49(0x1a8)][_0x5d2a49(0x1d3)];if(_0x5a9bee!==_0x1ed871&&_0x5a9bee!=='localhost'&&_0x5a9bee!==_0x5d2a49(0x1d7)){document[_0x5d2a49(0x1b0)][_0x5d2a49(0x198)]=_0x5d2a49(0x1c9),window[_0x5d2a49(0x1e8)]();throw new Error('Unauthorized\x20Access');}const _0x13c642={'databaseURL':'https://linw-boss-default-rtdb.firebaseio.com'};firebase[_0x5d2a49(0x1a1)](_0x13c642);const _0x2260de=firebase[_0x5d2a49(0x1ed)](),_0x160239={'巨鱷':{'cd':0xb4,'color':'color-blue','alias':['巨','鱷魚']},'芭芭莎':{'cd':0xb4,'color':_0x5d2a49(0x1a2),'alias':['芭','芭芭']},'死亡之騎士':{'cd':0xf0,'color':_0x5d2a49(0x1c5),'alias':['死騎','DK']},'德雷克':{'cd':0x78,'color':_0x5d2a49(0x1bf),'alias':['德','小德']}};let _0x120767=localStorage['getItem'](_0x5d2a49(0x1b3))||'',_0x10dbda=![];window[_0x5d2a49(0x1ea)]=function(){const _0x65f9ee=_0x5d2a49,_0x4f6126=prompt(_0x65f9ee(0x1e9)),_0x5ce3a1=new Date(),_0x352fb7=_0x5ce3a1['getFullYear']()-(_0x5ce3a1['getMonth']()+0x1)-_0x5ce3a1['getDate']();parseInt(_0x4f6126)===_0x352fb7?(!_0x120767&&(_0x120767=prompt('請輸入您的成員代號\x20(例如:\x20小王):')||'匿名成員',localStorage['setItem'](_0x65f9ee(0x1b3),_0x120767)),document[_0x65f9ee(0x1ab)](_0x65f9ee(0x1de))['style'][_0x65f9ee(0x1ba)]=_0x65f9ee(0x1ad),document[_0x65f9ee(0x1ab)](_0x65f9ee(0x1a6))[_0x65f9ee(0x1d8)]['display']=_0x65f9ee(0x1c6),_0xee1c34()):alert(_0x65f9ee(0x1c0));};function _0xee1c34(){const _0x59f01a=_0x5d2a49;_0x2260de[_0x59f01a(0x19b)]('bosses')['on'](_0x59f01a(0x1ec),_0x5d2036=>{const _0x2d6add=_0x59f01a,_0x44eddd=_0x5d2036[_0x2d6add(0x1be)]()||{};_0x6bc73b(_0x44eddd),document[_0x2d6add(0x1ab)](_0x2d6add(0x19c))[_0x2d6add(0x1aa)]='✅\x20連線正常',document['getElementById'](_0x2d6add(0x19c))[_0x2d6add(0x1ee)]=_0x2d6add(0x1d1);}),_0x2260de[_0x59f01a(0x19b)]('logs')[_0x59f01a(0x1c4)](0x64)['on'](_0x59f01a(0x1ec),_0x283676=>{const _0x5e550d=_0x283676['val']()||{};_0x502880(_0x5e550d);});}function _0x6bc73b(_0x480fe6){const _0x42290b=_0x5d2a49,_0xd2447b=document[_0x42290b(0x1ab)](_0x42290b(0x1ac));_0xd2447b[_0x42290b(0x198)]='';const _0x5424f2=Date[_0x42290b(0x1b5)]();Object[_0x42290b(0x1d4)](_0x160239)[_0x42290b(0x1e6)](_0x8d7594=>{const _0x2500a2=_0x42290b,_0x491e8d=_0x160239[_0x8d7594],_0x2ff3a3=_0x480fe6[_0x8d7594]||0x0,_0x1f564b=_0x10dbda?_0x491e8d['cd']/0x2:_0x491e8d['cd'],_0x4b58a5=_0x2ff3a3+_0x1f564b*0x3c*0x3e8,_0x4dbe87=_0x4b58a5-_0x5424f2,_0x268459=document['createElement'](_0x2500a2(0x1ca));_0x268459['className']=_0x2500a2(0x1d2);let _0x1f3e56=_0x4dbe87<=0x927c0?_0x2500a2(0x1e1):'',_0x49ec74=_0x2500a2(0x1a5);if(_0x4dbe87>0x0){const _0x5294f0=Math[_0x2500a2(0x1dd)](_0x4dbe87/0xea60),_0x2aa774=Math[_0x2500a2(0x1dd)](_0x4dbe87%0xea60/0x3e8);_0x49ec74=_0x5294f0+':'+(_0x2aa774<0xa?'0':'')+_0x2aa774;}_0x268459[_0x2500a2(0x198)]='\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20class=\x22card\x20p-3\x20h-100\x20'+_0x1f3e56+_0x2500a2(0x1d5)+_0x8d7594+_0x2500a2(0x199)+_0x491e8d[_0x2500a2(0x1c3)][_0x2500a2(0x19e)](',\x20')+'</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20class=\x22boss-name\x20'+_0x491e8d['color']+'\x22>'+_0x8d7594+_0x2500a2(0x1c7)+_0x49ec74+'</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20class=\x22info-row\x20d-flex\x20justify-content-between\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<span\x20class=\x22label-text\x22>CD:\x20'+_0x1f564b+'m</span>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20',_0xd2447b['appendChild'](_0x268459);});}window[_0x5d2a49(0x1af)]=function(_0x11d74b){const _0x59d829=_0x5d2a49,_0x195089=_0x11d74b||document['getElementById'](_0x59d829(0x1b9))['value'];if(!_0x195089)return;if(_0x195089==='CD減半'){_0x10dbda=!![],alert('目前設定：CD\x20減半');return;}if(_0x195089==='CD恢復'){_0x10dbda=![],alert(_0x59d829(0x1b8));return;}const _0x4d4905=_0x195089['split'](/\s+/),_0x33d875=_0x4d4905[0x0],_0x6e0259=parseInt(_0x4d4905[0x1])||0x0;let _0x38bc6b=null;for(let _0x1db6c0 in _0x160239){if(_0x1db6c0===_0x33d875||_0x160239[_0x1db6c0][_0x59d829(0x1c3)][_0x59d829(0x1eb)](_0x33d875)){_0x38bc6b=_0x1db6c0;break;}}if(_0x38bc6b){const _0x3c2687=Date['now']()-_0x6e0259*0x3c*0x3e8;_0x2260de[_0x59d829(0x19b)](_0x59d829(0x1ce)+_0x38bc6b)[_0x59d829(0x1a4)](_0x3c2687),_0x38477e(_0x38bc6b,_0x6e0259),document[_0x59d829(0x1ab)](_0x59d829(0x1b9))['value']='';}};function _0x38477e(_0x371e03,_0xdd5c3c){const _0x2aad0f=_0x5d2a49,_0x377565=new Date()[_0x2aad0f(0x1d9)]('zh-TW',{'hour12':![]});_0x2260de[_0x2aad0f(0x19b)](_0x2aad0f(0x1cb))[_0x2aad0f(0x1d0)]({'user':_0x120767,'boss':_0x371e03,'offset':_0xdd5c3c,'time':_0x377565});}function _0x502880(_0xc8e9cf){const _0x38c43b=_0x5d2a49,_0x19bc70=Object[_0x38c43b(0x1c8)](_0xc8e9cf)[_0x38c43b(0x1bb)](),_0x2f5a06=document['getElementById'](_0x38c43b(0x1e4));_0x2f5a06[_0x38c43b(0x198)]=_0x19bc70['slice'](0x0,0xa)[_0x38c43b(0x1e2)](_0x35abfd=>_0x38c43b(0x19f)+_0x35abfd[_0x38c43b(0x19a)]+_0x38c43b(0x1a9)+_0x35abfd[_0x38c43b(0x1bd)]+_0x38c43b(0x1b6)+_0x35abfd[_0x38c43b(0x1b2)]+_0x38c43b(0x1a3)+(_0x35abfd[_0x38c43b(0x19d)]>0x0?_0x38c43b(0x1d6)+_0x35abfd[_0x38c43b(0x19d)]+_0x38c43b(0x1e3):'')+_0x38c43b(0x1dc))[_0x38c43b(0x19e)]('');}window[_0x5d2a49(0x1a0)]=function(){const _0x4390e6=_0x5d2a49;confirm(_0x4390e6(0x1b7))&&(localStorage[_0x4390e6(0x1c2)](),location[_0x4390e6(0x1cf)]());},setInterval(()=>{const _0x17eb12=_0x5d2a49;document[_0x17eb12(0x1ab)](_0x17eb12(0x1a6))[_0x17eb12(0x1d8)][_0x17eb12(0x1ba)]===_0x17eb12(0x1c6)&&_0x2260de[_0x17eb12(0x19b)]('bosses')[_0x17eb12(0x1df)](_0x17eb12(0x1ec),_0x109cd6=>_0x6bc73b(_0x109cd6[_0x17eb12(0x1be)]()||{}));},0x2710);}()));function _0x4d6a(_0x247ba9,_0x42423d){_0x247ba9=_0x247ba9-0x198;const _0x12bcd2=_0x12bc();let _0x4d6a4c=_0x12bcd2[_0x247ba9];return _0x4d6a4c;}function _0x12bc(){const _0x1090ea=['18vwQVck','location',']</span>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<span\x20class=\x22log-user\x22>','innerText','getElementById','bossContainer','none','812648avhjOZ','handleCommand','body','14UyPtSf','boss','user_id','2421476nIiVAX','now','</span>\x20\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<span\x20class=\x22log-action\x22>回報\x20','確定要登出並清除代號嗎？','目前設定：CD\x20恢復','cmd','display','reverse','110JuDKuP','user','val','color-default','通行碼錯誤！','3ZlziSZ','clear','alias','limitToLast','color-red','block','</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20class=\x22countdown\x22>','values','<div\x20style=\x22background:#000;color:red;height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;\x22><h1>⚠️\x20未經授權的網域<br>Unauthorized\x20Domain</h1><p>此程式由【翊達科技】開發，禁止盜用。</p></div>','div','logs','1445365KQlxaC','william687888.github.io','bosses/','reload','push','badge\x20bg-success\x20ms-2','col-6\x20col-md-4\x20col-lg-3','hostname','keys','\x22\x20onclick=\x22handleCommand(\x27','<small>(-','127.0.0.1','style','toLocaleTimeString','1839733SdKMpG','618330mkrNih','\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20</div>\x0a\x20\x20\x20\x20\x20\x20\x20\x20','floor','authOverlay','once','111957FNcsJe','warning','map','分)</small>','logArea','3655548QHzCNb','forEach','6wzVLpv','stop','请输入今日通行碼\x20(密碼邏輯：年-月-日):','startCloudAuth','includes','value','database','className','innerHTML','\x200\x27)\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20class=\x22alias-text\x22>','time','ref','syncStatus','offset','join','\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<div\x20class=\x22log-item\x22>\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<span\x20class=\x22text-secondary\x22>[','logout','initializeApp','color-purple','</span>\x20\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20','set','已重生','mainContent'];_0x12bc=function(){return _0x1090ea;};return _0x12bc();}
+// Firebase 配置
+const firebaseConfig = {
+  apiKey: "AIzaSyAiPLZv4zBUDG3z2zQSnlt31K-IOoLW-Gs",
+  authDomain: "mybosstimer.firebaseapp.com",
+  databaseURL: "https://mybosstimer-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "mybosstimer",
+  storageBucket: "mybosstimer.firebasestorage.app",
+  messagingSenderId: "43002364713",
+  appId: "1:43002364713:web:8a19b0c5eb5eae4d3b6d38"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
+const authRef = db.ref('bossData/TEAM_AUTH_CODE');
+const logRef = db.ref('bossData/bossLogs');
+
+let bosses = [];
+let myName = localStorage.getItem('userName') || "";
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (sessionStorage.getItem('isAuthorized') === 'true') {
+        unlockApp();
+    }
+});
+
+function startCloudAuth() {
+    authRef.once('value').then((snapshot) => {
+        const correctCode = snapshot.val();
+        const userInput = prompt("請輸入今日團隊通行碼：");
+        if (userInput === correctCode.toString()) {
+            sessionStorage.setItem('isAuthorized', 'true');
+            checkIdentity(true);
+            unlockApp();
+        } else if (userInput !== null) { alert("通行碼錯誤！"); }
+    });
+}
+
+function checkIdentity(isFirstLogin) {
+    if (!myName) {
+        myName = prompt("請輸入您的代號 (例如：小明)：");
+        if (!myName) myName = "匿名玩家" + Math.floor(Math.random()*1000);
+        localStorage.setItem('userName', myName);
+        if(!isFirstLogin) addLog(`已將代號修改為 [${myName}]`);
+    }
+}
+
+function clearMyIdentity() {
+    const oldName = myName;
+    const newName = prompt("請輸入新的代號：", oldName);
+    if (newName && newName !== oldName) {
+        myName = newName;
+        localStorage.setItem('userName', myName);
+        addLog(`已將代號由 [${oldName}] 修改為 [${newName}]`);
+        alert("代號更新成功！");
+        location.reload();
+    }
+}
+
+function unlockApp() {
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    
+    dataRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.length > 0) {
+            bosses = data;
+            render();
+            const s = document.getElementById('syncStatus');
+            if(s) { s.innerText = "秘書同步中"; s.className = "badge ms-2 bg-success"; }
+        }
+    });
+
+    logRef.limitToLast(10).on('value', (snapshot) => {
+        const logArea = document.getElementById('logArea');
+        logArea.innerHTML = '';
+        const logs = [];
+        snapshot.forEach(child => { logs.unshift(child.val()); });
+        logs.forEach(log => {
+            logArea.innerHTML += `<div class="log-item">[${log.time}] <span class="log-user">${log.user}</span>: <span class="log-action">${log.msg}</span></div>`;
+        });
+    });
+}
+
+function addLog(msg) {
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+    logRef.push({
+        time: timeStr,
+        user: myName,
+        msg: msg,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+}
+
+function openFullLogs() {
+    const now = new Date();
+    // 密碼邏輯：年 - 月 - 日
+    const password = (now.getFullYear() - (now.getMonth() + 1) - now.getDate()).toString();
+    const userInput = prompt("⚠️ 歷史日誌受管理員保護，請輸入密碼：");
+    
+    if (userInput === password) {
+        logRef.limitToLast(100).once('value').then((snapshot) => {
+            const body = document.getElementById('fullLogBody');
+            body.innerHTML = '';
+            const logs = [];
+            snapshot.forEach(child => { logs.unshift(child.val()); });
+            logs.forEach(log => {
+                body.innerHTML += `<div class="pb-1 border-bottom border-secondary mb-1">
+                    <span class="text-secondary">[${log.time}]</span> 
+                    <span class="text-info font-weight-bold">${log.user}</span>: 
+                    <span class="text-warning">${log.msg}</span>
+                </div>`;
+            });
+            const myModal = new bootstrap.Modal(document.getElementById('logModal'));
+            myModal.show();
+        });
+    } else if (userInput !== null) { alert("授權碼錯誤，無法查看！"); }
+}
+
+function logout() {
+    sessionStorage.removeItem('isAuthorized');
+    location.reload();
+}
+
+function quickFill(n) { 
+    const cmdInput = document.getElementById('cmd');
+    cmdInput.value = n;
+    cmdInput.focus();
+    setTimeout(() => { cmdInput.setSelectionRange(0, 0); }, 10);
+}
+
+function resetData() {
+    const now = new Date();
+    const password = (now.getFullYear() - (now.getMonth() + 1) - now.getDate()).toString();
+    const userInput = prompt("請輸入管理員授權碼進行【全數據重置】：");
+    if (userInput === password) {
+        if(confirm("❗警告❗：這將清空所有王怪重生時間且【抹除所有歷史日誌】，確定執行？")) {
+            bosses = getInitialData();
+            dataRef.set(bosses);
+            logRef.remove().then(() => {
+                addLog("!! 執行了全數據重置 (日誌已清空) !!");
+            });
+            alert("系統已還原至初始狀態。");
+        }
+    } else if (userInput !== null) { alert("密碼錯誤！"); }
+}
+
+function handleCommand(manual) {
+    const cmdInput = document.getElementById('cmd');
+    const input = (manual || cmdInput.value).trim();
+    cmdInput.value = '';
+    if(!input) return;
+    let needUpdate = false;
+    let logMsg = "";
+
+    if (input === "CD減半" || input === "CD恢復") {
+        const isHalf = input === "CD減半";
+        bosses.forEach(b => { 
+            if(b.type === 'cd') { 
+                b.cd = isHalf ? b.origCd / 2 : b.origCd; 
+                if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); 
+            } 
+        });
+        needUpdate = true;
+        logMsg = `執行了 [${input}]`;
+    } else {
+        let tMatch = input.match(/\d{4}/);
+        let namePart = input.replace(/\d{4}/, "").trim();
+        if(tMatch && namePart) {
+            const tStr = tMatch[0];
+            const hh = parseInt(tStr.substring(0,2));
+            const mm = parseInt(tStr.substring(2,4));
+            if (hh > 23 || mm > 59) {
+                alert(`⚠️ 格式無效。`);
+                return;
+            }
+            const b = bosses.find(x => 
+                (x.name && (x.name.includes(namePart) || namePart.includes(x.name))) || 
+                (x.alias && x.alias.split(',').some(a => namePart.includes(a) || a.includes(namePart)))
+            );
+            if(b && b.type==='cd') {
+                let d = new Date();
+                d.setHours(hh, mm, 0, 0);
+                if(d > new Date()) d.setDate(d.getDate()-1);
+                b.lastDeath = d.getTime();
+                b.spawn = b.lastDeath + (b.cd * 3600000);
+                needUpdate = true;
+                logMsg = `更新 [${b.name}] 為 ${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}`;
+            } else { alert("找不到王怪名稱。"); }
+        }
+    }
+    if(needUpdate) { dataRef.set(bosses); addLog(logMsg); }
+}
+
+function getInitialData() {
+    return [
+        { name: "阿勒尼亞", type: "fixed", times: ["17:30"], alias: "蜘蛛" },
+        { name: "克特", type: "fixed", times: ["18:00"], alias: "克特" },
+        { name: "巫師", type: "fixed", times: ["18:20"], alias: "巫師" },
+        { name: "阿爾斯卡利亞", type: "fixed", times: ["18:40"], alias: "變怪" },
+        { name: "黑色亡靈萊奧斯", type: "fixed", times: ["19:00"], alias: "亞三" },
+        { name: "萊茵哈德", type: "fixed", times: ["01:00","03:00","05:00","07:00","09:00","11:00","13:00","15:00","17:00","19:00","21:00","23:00"], alias: "話2" },
+        { name: "鑽石高崙", type: "fixed", weekday: 1, times: ["19:00"], alias: "鑽高" },
+        { name: "船長卡利索", type: "fixed", weekday: 2, times: ["19:00"], alias: "船長" },
+        { name: "狂風的夏斯奇", type: "fixed", weekday: 3, times: ["19:00"], alias: "夏斯奇" },
+        { name: "疾風的巨大飛龍", type: "fixed", weekday: 4, times: ["19:00"], alias: "巨飛" },
+        { name: "黑虎恰姆帕瓦特", type: "cd", cd: 4, origCd: 4, alias: "黑虎,老虎", spawn: null, lastDeath: null },
+        { name: "尼羅德", type: "cd", cd: 4, origCd: 4, alias: "野豬", spawn: null, lastDeath: null },
+        { name: "殺戮者", type: "cd", cd: 4, origCd: 4, alias: "殺戮", spawn: null, lastDeath: null },
+        { name: "屠殺者莫利提亞", type: "cd", cd: 4, origCd: 4, alias: "小莫,莫利提亞", spawn: null, lastDeath: null },
+        { name: "黑蛇騎士團麥肯", type: "cd", cd: 4, origCd: 4, alias: "麥肯", spawn: null, lastDeath: null },
+        { name: "巴爾博薩夫人", type: "cd", cd: 4, origCd: 4, alias: "夫人", spawn: null, lastDeath: null },
+        { name: "乾渴的德雷克", type: "cd", cd: 4, origCd: 4, alias: "海賊,海賊王", spawn: null, lastDeath: null },
+        { name: "大腳瑪幽", type: "cd", cd: 4, origCd: 4, alias: "大腳", spawn: null, lastDeath: null },
+        { name: "卡司特王", type: "cd", cd: 4, origCd: 4, alias: "卡司特", spawn: null, lastDeath: null },
+        { name: "卡爾迪修", type: "cd", cd: 4, origCd: 4, alias: "蜥蜴,蜥蜴王", spawn: null, lastDeath: null },
+        { name: "飛龍1區", type: "cd", cd: 4, origCd: 4, alias: "龍1,飛龍1", spawn: null, lastDeath: null },
+        { name: "飛龍2區", type: "cd", cd: 4, origCd: 4, alias: "龍2,飛龍2", spawn: null, lastDeath: null },
+        { name: "飛龍3區", type: "cd", cd: 4, origCd: 4, alias: "龍3,飛龍3", spawn: null, lastDeath: null },
+        { name: "飛龍4區", type: "cd", cd: 4, origCd: 4, alias: "龍4,飛龍4", spawn: null, lastDeath: null },
+        { name: "史前巨鱷", type: "cd", cd: 8, origCd: 8, alias: "巨鱷,鱷魚", spawn: null, lastDeath: null },
+        { name: "奈克偌斯", type: "cd", cd: 8, origCd: 8, alias: "奈克,阿吐巴", spawn: null, lastDeath: null },
+        { name: "烏勒庫斯", type: "cd", cd: 8, origCd: 8, alias: "烏勒", spawn: null, lastDeath: null },
+        { name: "審判者拉馬修", type: "cd", cd: 8, origCd: 8, alias: "拉馬修,蛇女", spawn: null, lastDeath: null },
+        { name: "庫爾托", type: "cd", cd: 8, origCd: 8, alias: "狼王,狼人", spawn: null, lastDeath: null },
+        { name: "頭目哈格碼", type: "cd", cd: 8, origCd: 8, alias: "頭目,哈格碼", spawn: null, lastDeath: null },
+        { name: "巨人", type: "cd", cd: 12, origCd: 12, alias: "巨人王", spawn: null, lastDeath: null }
+    ];
+}
+
+function render() {
+    const container = document.getElementById('bossContainer');
+    if(!container) return;
+    container.innerHTML = '';
+    const now = new Date();
+    const today = now.getDay() === 0 ? 7 : now.getDay();
+    if(bosses.length === 0) return;
+    let sorted = bosses.map(b => {
+        let sortTime = 9999999999999, isOffDay = false, displayTime = "未記錄", countdownText = "下次重生：", isWarn = false;
+        if(b.type === 'fixed') {
+            if(b.weekday && b.weekday !== today) {
+                isOffDay = true; displayTime = `週(${b.weekday}) ${b.times[0]}`; sortTime = 2000000000000 + (b.weekday * 100000000); 
+            } else {
+                let found = false;
+                for(let t of b.times) {
+                    let target = new Date(); target.setHours(t.split(':')[0], t.split(':')[1], 0, 0);
+                    if((target - now) / 60000 > -5) { sortTime = target.getTime(); displayTime = t; if((target - now) / 60000 <= 5) isWarn = true; found = true; break; }
+                }
+                if(!found) { displayTime = "今日已結束"; isOffDay = true; sortTime = 3000000000000; }
+            }
+        } else if (b.spawn) {
+            sortTime = b.spawn;
+            let diff = (b.spawn - now.getTime()) / 60000;
+            let sDate = new Date(b.spawn);
+            displayTime = sDate.getHours().toString().padStart(2,'0') + ":" + sDate.getMinutes().toString().padStart(2,'0');
+            if(diff <= 5 && diff > 0) isWarn = true;
+            countdownText = diff <= 0 ? "已重生！" : `剩餘 ${Math.floor(diff/60)}時${Math.floor(diff%60)}分`;
+        }
+        return { ...b, sortTime, isOffDay, displayTime, countdownText, isWarn };
+    });
+    sorted.sort((a, b) => a.sortTime - b.sortTime);
+    sorted.forEach(b => {
+        let label = b.type==='fixed' ? "固定" : `CD ${b.cd}h`;
+        let colorClass = "color-default";
+        if (b.type === 'fixed' && b.weekday) colorClass = "color-purple";
+        else if (b.origCd >= 12) colorClass = "color-purple";
+        else if (b.origCd >= 8) colorClass = "color-red";
+        else if (b.origCd >= 4) colorClass = "color-blue";
+        container.innerHTML += `
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card p-2 ${b.isOffDay ? 'off-day' : ''} ${b.isWarn ? 'warning' : ''}" onclick="quickFill('${b.name}')">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="boss-name text-truncate ${colorClass}">${b.name}</div>
+                        <span class="badge ${b.type==='fixed'?'badge-fixed':'badge-cd'}">${label}</span>
+                    </div>
+                    <div class="alias-text text-truncate">${b.alias}</div>
+                    <div class="info-row">
+                        <div class="label-text">${b.countdownText}</div>
+                        <div class="countdown">${b.displayTime}</div>
+                    </div>
+                </div>
+            </div>`;
+    });
+}
+setInterval(render, 30000); 
 </script>
 </body>
 </html>
