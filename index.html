@@ -89,6 +89,7 @@
 </div>
 
 <script>
+// Firebase 配置
 const firebaseConfig = {
   apiKey: "AIzaSyAiPLZv4zBUDG3z2zQSnlt31K-IOoLW-Gs",
   authDomain: "mybosstimer.firebaseapp.com",
@@ -103,23 +104,16 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const rootRef = db.ref('bossData');
 const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
-const authRef = db.ref('bossData/auth_code'); // 唯一驗證路徑
+const authRef = db.ref('bossData/auth_code'); 
 const logRef = db.ref('bossData/bossLogs');
 const adminNameRef = db.ref('bossData/ADMIN_NAME');
 
 let bosses = [];
 let myName = localStorage.getItem('userName') || "";
-let currentAdmin = "團隊管理員";
 
-// 1. 監聽管理員名稱（包含初始化）
+// 核心監聽：管理員名稱
 adminNameRef.on('value', (snap) => {
-    let val = snap.val();
-    if (!val) {
-        val = "翊達科技";
-        // 只有在已驗證狀態下才嘗試自動補寫入
-        if(sessionStorage.getItem('isAuthorized') === 'true') adminNameRef.set(val);
-    }
-    currentAdmin = val;
+    const val = snap.val() || "團隊管理員";
     document.querySelectorAll('.dyn-admin').forEach(el => el.innerText = val);
     document.title = `🛡️ ${val}王團秘書`;
 });
@@ -130,21 +124,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function startCloudAuth() {
     authRef.once('value').then((snap) => {
-        let correctCode = snap.val();
-        // 防呆：如果資料庫是空的，手動輸入 8888 即可初始化
-        if (!correctCode) correctCode = "8888"; 
-        
+        const correctCode = snap.val();
+        if (!correctCode) {
+            alert("錯誤：資料庫中找不到 auth_code 欄位，請手動新增。");
+            return;
+        }
         const input = prompt("請輸入團隊通行碼：");
         if (input && input.toString() === correctCode.toString()) {
             sessionStorage.setItem('isAuthorized', 'true');
             sessionStorage.setItem('tempAuth', input);
-            
-            // 登入成功後，立刻確保資料庫有基本的欄位
-            rootRef.update({ 
-                "auth_code": input,
-                "ADMIN_NAME": currentAdmin 
-            });
-
             if(!myName) {
                 myName = prompt("您的代號：") || "成員";
                 localStorage.setItem('userName', myName);
@@ -157,10 +145,14 @@ function startCloudAuth() {
 function unlockApp() {
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
+    
+    // 監聽 Boss 數據
     dataRef.on('value', (snap) => {
         const d = snap.val();
         if (d) { bosses = d; render(); document.getElementById('syncStatus').innerText = "雲端同步中"; document.getElementById('syncStatus').className = "badge bg-success"; }
     });
+
+    // 監聽紀錄
     logRef.limitToLast(30).on('value', (snap) => {
         const liveBox = document.getElementById('liveLogBox');
         const fullArea = document.getElementById('fullLogArea');
@@ -214,7 +206,6 @@ function handleCommand(manual) {
     }
     if(update) {
         const currentCode = sessionStorage.getItem('tempAuth');
-        // 修正：這裡的 Key 統稱為 auth_code
         rootRef.update({ 
             "SECRETARY_PRO_DATA": bosses, 
             "auth_code": currentCode 
