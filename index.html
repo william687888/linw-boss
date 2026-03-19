@@ -103,7 +103,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const rootRef = db.ref('bossData');
 const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
-const authRef = db.ref('bossData/auth_code'); // 統一路徑
+const authRef = db.ref('bossData/auth_code'); // 唯一驗證路徑
 const logRef = db.ref('bossData/bossLogs');
 const adminNameRef = db.ref('bossData/ADMIN_NAME');
 
@@ -111,12 +111,13 @@ let bosses = [];
 let myName = localStorage.getItem('userName') || "";
 let currentAdmin = "團隊管理員";
 
-// 監聽並自動初始化 ADMIN_NAME
+// 1. 監聽管理員名稱（包含初始化）
 adminNameRef.on('value', (snap) => {
     let val = snap.val();
     if (!val) {
-        adminNameRef.set("翊達科技"); // 如果沒看到，強制寫入預設值
         val = "翊達科技";
+        // 只有在已驗證狀態下才嘗試自動補寫入
+        if(sessionStorage.getItem('isAuthorized') === 'true') adminNameRef.set(val);
     }
     currentAdmin = val;
     document.querySelectorAll('.dyn-admin').forEach(el => el.innerText = val);
@@ -130,15 +131,20 @@ document.addEventListener("DOMContentLoaded", () => {
 function startCloudAuth() {
     authRef.once('value').then((snap) => {
         let correctCode = snap.val();
-        // 如果資料庫完全空了，預設一個初始密碼防止死鎖
-        if (!correctCode) {
-            authRef.set("8888");
-            correctCode = "8888";
-        }
+        // 防呆：如果資料庫是空的，手動輸入 8888 即可初始化
+        if (!correctCode) correctCode = "8888"; 
+        
         const input = prompt("請輸入團隊通行碼：");
         if (input && input.toString() === correctCode.toString()) {
             sessionStorage.setItem('isAuthorized', 'true');
             sessionStorage.setItem('tempAuth', input);
+            
+            // 登入成功後，立刻確保資料庫有基本的欄位
+            rootRef.update({ 
+                "auth_code": input,
+                "ADMIN_NAME": currentAdmin 
+            });
+
             if(!myName) {
                 myName = prompt("您的代號：") || "成員";
                 localStorage.setItem('userName', myName);
@@ -208,7 +214,11 @@ function handleCommand(manual) {
     }
     if(update) {
         const currentCode = sessionStorage.getItem('tempAuth');
-        rootRef.update({ "SECRETARY_PRO_DATA": bosses, "auth_code": currentCode }).then(() => {
+        // 修正：這裡的 Key 統稱為 auth_code
+        rootRef.update({ 
+            "SECRETARY_PRO_DATA": bosses, 
+            "auth_code": currentCode 
+        }).then(() => {
             const now = new Date();
             const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
             logRef.push({ time: timeStr, user: myName, msg: logMsg });
@@ -225,7 +235,11 @@ function adminReset() {
             if(Number(p) === correctResetCode) {
                 const currentCode = sessionStorage.getItem('tempAuth');
                 bosses.forEach(b => { if(b.type==='cd') { delete b.lastDeath; delete b.spawn; } });
-                rootRef.update({ "SECRETARY_PRO_DATA": bosses, "auth_code": currentCode, "bossLogs": null }).then(() => {
+                rootRef.update({ 
+                    "SECRETARY_PRO_DATA": bosses, 
+                    "auth_code": currentCode, 
+                    "bossLogs": null 
+                }).then(() => {
                     alert("數據重置成功"); location.reload();
                 });
             } else { alert("密碼驗證錯誤，請重新輸入！"); }
