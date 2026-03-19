@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛡️ 天堂W王團秘書 - 完整功能版</title>
+    <title>🛡️ 天堂W王團秘書 - 翊達科技正式版</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -11,7 +11,8 @@
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
         #mainContent { display: none; }
         #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
-        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; cursor: pointer; }
+        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; cursor: pointer; transition: 0.1s; }
+        .card:active { transform: scale(0.96); background-color: #333; }
         .boss-name { font-size: 1.05rem; font-weight: bold; }
         .color-default { color: #ffca2c; } 
         .color-purple { color: #bf40ff; }
@@ -22,8 +23,9 @@
         .off-day { opacity: 0.3; filter: grayscale(1); }
         @keyframes blinker { 50% { opacity: 0.7; } }
         .btn-gold { background-color: #ffca2c; color: #000; font-weight: bold; border: none; }
-        #cmd { background-color: #2a2a2a; color: #fff; border: 1px solid #ffca2c; }
+        #cmd { background-color: #2a2a2a; color: #fff; border: 1px solid #ffca2c; font-size: 1.1rem; }
         #logArea { font-size: 0.8rem; background: #000; color: #aaa; border: 1px solid #444; border-radius: 8px; height: 150px; overflow-y: auto; padding: 10px; }
+        .log-item { border-bottom: 1px solid #222; padding-bottom: 2px; }
     </style>
 </head>
 <body>
@@ -38,7 +40,6 @@
 
 <div id="mainContent" class="container py-4">
     <h3 class="text-center mb-4">🛡️ 天堂W王團秘書</h3>
-    
     <div class="card p-3 mb-4 shadow" style="cursor: default;">
         <div class="input-group">
             <input type="text" id="cmd" class="form-control" placeholder="輸入 [王名+時間]" onkeypress="if(event.keyCode==13) handleCommand()">
@@ -50,9 +51,7 @@
             <button class="btn btn-outline-danger btn-sm m-1" onclick="adminReset()">🧹 數據重置</button>
             <span id="syncStatus" class="badge bg-secondary ms-2">等待授權...</span>
         </div>
-        <div class="mt-3">
-            <div id="logArea">正在讀取雲端數據...</div>
-        </div>
+        <div class="mt-3"><div id="logArea">正在讀取雲端數據...</div></div>
     </div>
     <div id="bossContainer" class="row g-2"></div>
 </div>
@@ -106,16 +105,16 @@ function unlockApp() {
         if (d) { bosses = d; render(); document.getElementById('syncStatus').innerText = "雲端同步中"; document.getElementById('syncStatus').className = "badge ms-2 bg-success"; }
     });
     logRef.limitToLast(10).on('value', (snap) => {
-        const area = document.getElementById('logArea');
-        area.innerHTML = '';
+        const area = document.getElementById('logArea'); area.innerHTML = '';
         const logs = []; snap.forEach(c => { logs.unshift(c.val()); });
         logs.forEach(l => { area.innerHTML += `<div class="log-item">[${l.time}] <span class="log-user">${l.user}</span>: ${l.msg}</div>`; });
     });
 }
 
 function handleCommand(manual) {
-    const input = (manual || document.getElementById('cmd').value).trim();
-    document.getElementById('cmd').value = '';
+    const cmdInput = document.getElementById('cmd');
+    const input = (manual || cmdInput.value).trim();
+    cmdInput.value = '';
     if(!input) return;
     let update = false, logMsg = "";
 
@@ -142,21 +141,36 @@ function handleCommand(manual) {
             const now = new Date();
             const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
             logRef.push({ time: timeStr, user: myName, msg: logMsg });
-        }).catch(() => { alert("⚠️ 權限不足。"); });
+        }).catch(() => { alert("⚠️ 權限驗證失敗。"); });
     }
 }
 
+// --- 關鍵修正：動態管理員密碼 (年-月-日) ---
 function adminReset() {
-    if(confirm("❗確定要清空所有紀錄與日誌嗎？")) {
-        const p = prompt("請再次輸入團隊通行碼：");
-        const currentCode = sessionStorage.getItem('tempAuth');
-        if(p === currentCode) {
-            bosses.forEach(b => { if(b.type==='cd') { delete b.lastDeath; delete b.spawn; } });
-            rootRef.update({ "SECRETARY_PRO_DATA": bosses, "auth_code": currentCode, "bossLogs": null }).then(() => {
-                alert("數據已重置");
-                location.reload();
-            });
-        } else { alert("驗證不符。"); }
+    if(confirm("❗確定要完全重置數據嗎？")) {
+        const p = prompt("請輸入動態重置碼 (年-月-日)：");
+        if(p !== null) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1; // getMonth 是 0-11
+            const day = now.getDate();
+            const correctResetCode = year - month - day; // 動態密碼邏輯
+            
+            if(Number(p) === correctResetCode) {
+                const currentCode = sessionStorage.getItem('tempAuth');
+                bosses.forEach(b => { if(b.type==='cd') { delete b.lastDeath; delete b.spawn; } });
+                rootRef.update({ 
+                    "SECRETARY_PRO_DATA": bosses, 
+                    "auth_code": currentCode, 
+                    "bossLogs": null 
+                }).then(() => {
+                    alert("數據已完全重置");
+                    location.reload();
+                });
+            } else {
+                alert("動態驗證失敗！(" + year + "-" + month + "-" + day + "=?)");
+            }
+        }
     }
 }
 
@@ -190,7 +204,7 @@ function render() {
         else if (b.origCd >= 12) color = "color-purple";
         else if (b.origCd >= 8) color = "color-red";
         else if (b.origCd >= 4) color = "color-blue";
-        container.innerHTML += `<div class="col-6 col-md-4 col-lg-3"><div class="card p-2 ${b.isOff ? 'off-day' : ''} ${b.warn ? 'warning' : ''}" onclick="document.getElementById('cmd').value='${b.name}';document.getElementById('cmd').focus();"><div class="d-flex justify-content-between"><div class="boss-name text-truncate ${color}">${b.name}</div><span class="badge ${b.type==='fixed'?'bg-primary':'bg-secondary'}" style="font-size:0.6rem;">${b.type==='fixed'?'固定':b.cd+'h'}</span></div><div style="font-size:0.75rem; color:#888;">${b.alias}</div><div class="mt-2 pt-2 border-top border-secondary"><div style="font-size:0.7rem; color:#aaa;">${b.cdText}</div><div class="countdown">${b.disp}</div></div></div></div>`;
+        container.innerHTML += `<div class="col-6 col-md-4 col-lg-3"><div class="card p-2 ${b.isOff ? 'off-day' : ''} ${b.warn ? 'warning' : ''}" onclick="document.getElementById('cmd').value='${b.name}'; document.getElementById('cmd').focus();"><div class="d-flex justify-content-between"><div class="boss-name text-truncate ${color}">${b.name}</div><span class="badge ${b.type==='fixed'?'bg-primary':'bg-secondary'}" style="font-size:0.6rem;">${b.type==='fixed'?'固定':b.cd+'h'}</span></div><div style="font-size:0.75rem; color:#888;">${b.alias}</div><div class="mt-2 pt-2 border-top border-secondary"><div style="font-size:0.7rem; color:#aaa;">${b.cdText}</div><div class="countdown">${b.disp}</div></div></div></div>`;
     });
 }
 setInterval(render, 30000); 
