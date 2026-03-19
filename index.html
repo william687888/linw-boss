@@ -89,7 +89,6 @@
 </div>
 
 <script>
-// Firebase 配置
 const firebaseConfig = {
   apiKey: "AIzaSyAiPLZv4zBUDG3z2zQSnlt31K-IOoLW-Gs",
   authDomain: "mybosstimer.firebaseapp.com",
@@ -104,14 +103,13 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const rootRef = db.ref('bossData');
 const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
-const authRef = db.ref('bossData/auth_code'); // 唯一的驗證欄位
+const authRef = db.ref('bossData/auth_code'); 
 const logRef = db.ref('bossData/bossLogs');
 const adminNameRef = db.ref('bossData/ADMIN_NAME');
 
 let bosses = [];
 let myName = localStorage.getItem('userName') || "";
 
-// 監聽管理員名稱
 adminNameRef.on('value', (snap) => {
     const val = snap.val() || "團隊管理員";
     document.querySelectorAll('.dyn-admin').forEach(el => el.innerText = val);
@@ -119,7 +117,6 @@ adminNameRef.on('value', (snap) => {
 });
 
 document.addEventListener("DOMContentLoaded", () => {
-    // 檢查授權狀態
     if (sessionStorage.getItem('isAuthorized') === 'true') {
         unlockApp();
     }
@@ -135,7 +132,7 @@ function startCloudAuth() {
         const input = prompt("請輸入團隊通行碼：");
         if (input && input.toString() === dbCode.toString()) {
             sessionStorage.setItem('isAuthorized', 'true');
-            sessionStorage.setItem('tempAuth', input); // 存入當前正確的驗證碼
+            sessionStorage.setItem('tempAuth', input); 
             if(!myName) {
                 myName = prompt("您的代號：") || "成員";
                 localStorage.setItem('userName', myName);
@@ -216,7 +213,6 @@ function handleCommand(manual) {
     }
 
     if(update) {
-        // 核心修正：確保傳送給 Firebase 的是 auth_code 且值為當前 Session 的正確驗證碼
         rootRef.update({ 
             "SECRETARY_PRO_DATA": bosses, 
             "auth_code": activeAuth 
