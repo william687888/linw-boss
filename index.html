@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛡️ 天堂W王團秘書 - 翊達科技正式版</title>
+    <title>🛡️ 天堂W王團秘書</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -33,7 +33,7 @@
 <body>
 
 <script>
-    // 網域檢驗：嚴格鎖定 william687888.github.io
+    // 網域檢驗
     (function() {
         if (window.location.hostname !== "william687888.github.io" && window.location.hostname !== "localhost") {
             document.body.innerHTML = "<h2 style='color:red;text-align:center;margin-top:50px;'>⚠️ 授權網域錯誤</h2>"; 
@@ -71,7 +71,6 @@
 </div>
 
 <script>
-// --- Firebase 核心配置 ---
 const firebaseConfig = {
   apiKey: "AIzaSyAiPLZv4zBUDG3z2zQSnlt31K-IOoLW-Gs",
   authDomain: "mybosstimer.firebaseapp.com",
@@ -84,7 +83,7 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-// 核心路徑：必須嚴格對應您的 Rules 結構
+const rootRef = db.ref('bossData');
 const dataRef = db.ref('bossData/SECRETARY_PRO_DATA');
 const authRef = db.ref('bossData/TEAM_AUTH_CODE');
 const logRef = db.ref('bossData/bossLogs');
@@ -98,10 +97,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function startCloudAuth() {
     authRef.once('value').then((snap) => {
-        const correctCode = snap.val(); // 此處從雲端抓取 10200608
+        const correctCode = snap.val();
         const input = prompt("請輸入團隊通行碼：");
         if (input && input.toString() === correctCode.toString()) {
             sessionStorage.setItem('isAuthorized', 'true');
+            sessionStorage.setItem('tempAuth', input); // 暫存通行碼供寫入使用
             if(!myName) {
                 myName = prompt("您的代號：") || "成員";
                 localStorage.setItem('userName', myName);
@@ -115,18 +115,15 @@ function unlockApp() {
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
     
-    // 監聽數據更新
     dataRef.on('value', (snap) => {
         const d = snap.val();
         if (d) { 
-            bosses = d; 
-            render(); 
+            bosses = d; render(); 
             document.getElementById('syncStatus').innerText = "雲端同步中"; 
             document.getElementById('syncStatus').className = "badge ms-2 bg-success"; 
         }
     });
 
-    // 監聽日誌
     logRef.limitToLast(10).on('value', (snap) => {
         const area = document.getElementById('logArea');
         area.innerHTML = '';
@@ -165,14 +162,17 @@ function handleCommand(manual) {
     }
 
     if(update) {
-        // 執行寫入：Firebase 會回頭比對 bossData/TEAM_AUTH_CODE 是否為 10200608
-        dataRef.set(bosses).then(() => {
+        // 同步發送當前使用的通行碼，供 Firebase Rules 校驗
+        const currentCode = sessionStorage.getItem('tempAuth');
+        rootRef.update({
+            "SECRETARY_PRO_DATA": bosses,
+            "auth_code": currentCode 
+        }).then(() => {
             const now = new Date();
             const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
             logRef.push({ time: timeStr, user: myName, msg: logMsg });
         }).catch(err => {
-            console.error(err);
-            alert("❌ 權限不足！請確認 Firebase 規則已發布且包含 10200608");
+            alert("⚠️ 權限不足或連線逾時，請重新整理頁面解鎖。");
         });
     }
 }
@@ -212,7 +212,7 @@ function render() {
         container.innerHTML += `
             <div class="col-6 col-md-4 col-lg-3">
                 <div class="card p-2 ${b.isOff ? 'off-day' : ''} ${b.warn ? 'warning' : ''}" onclick="document.getElementById('cmd').value='${b.name}';document.getElementById('cmd').focus();">
-                    <div class="d-flex justify-content-between align-items-start">
+                    <div class="d-flex justify-content-between">
                         <div class="boss-name text-truncate ${color}">${b.name}</div>
                         <span class="badge ${b.type==='fixed'?'bg-primary':'bg-secondary'}" style="font-size:0.6rem;">${b.type==='fixed'?'固定':b.cd+'h'}</span>
                     </div>
