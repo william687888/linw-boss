@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛡️ 天堂W王團秘書 - 翊達科技專業版</title>
+    <title>🛡️ 天堂W王團秘書 - 翊達科技最終穩定版</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -111,6 +111,7 @@ function unlockApp() {
     });
 }
 
+// --- 核心優化：handleCommand (回歸冒號解析與防呆) ---
 function handleCommand(manual) {
     const cmdInput = document.getElementById('cmd');
     const input = (manual || cmdInput.value).trim();
@@ -123,9 +124,19 @@ function handleCommand(manual) {
         bosses.forEach(b => { if(b.type==='cd'){ b.cd = isHalf ? b.origCd/2 : b.origCd; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); }});
         update = true; logMsg = `執行了 [${input}]`;
     } else {
-        let t = input.match(/\d{4}/), n = input.replace(/\d{4}/, "").trim();
-        if(t && n) {
-            const h = parseInt(t[0].substring(0,2)), m = parseInt(t[0].substring(2,4));
+        // 支援冒號解析 (例如 15:25 或 1525)
+        let tMatch = input.match(/(\d{1,2}):?(\d{2})/);
+        let n = input.replace(/(\d{1,2}):?(\d{2})/, "").trim();
+        
+        if(tMatch && n) {
+            const h = parseInt(tMatch[1]);
+            const m = parseInt(tMatch[2]);
+            
+            if (h > 23 || m > 59) {
+                alert("❗錯誤：無效的時間格式 (請輸入 00:00 - 23:59)");
+                return;
+            }
+
             const b = bosses.find(x => (x.name && (x.name.includes(n)||n.includes(x.name))) || (x.alias && x.alias.split(',').some(a=>n.includes(a))));
             if(b && b.type==='cd') {
                 let d = new Date(); d.setHours(h,m,0,0); if(d > new Date()) d.setDate(d.getDate()-1);
@@ -145,14 +156,12 @@ function handleCommand(manual) {
     }
 }
 
-// --- 最終修正：嚴謹驗證，不留提示 ---
 function adminReset() {
     if(confirm("❗確定要完全重置數據嗎？")) {
         const p = prompt("請輸入重置密碼：");
         if(p !== null) {
             const now = new Date();
             const correctResetCode = now.getFullYear() - (now.getMonth() + 1) - now.getDate();
-            
             if(Number(p) === correctResetCode) {
                 const currentCode = sessionStorage.getItem('tempAuth');
                 bosses.forEach(b => { if(b.type==='cd') { delete b.lastDeath; delete b.spawn; } });
@@ -160,14 +169,12 @@ function adminReset() {
                     alert("數據重置成功");
                     location.reload();
                 });
-            } else {
-                // 專業回饋：不解釋、不洩密
-                alert("密碼驗證錯誤，請重新輸入！");
-            }
+            } else { alert("密碼驗證錯誤，請重新輸入！"); }
         }
     }
 }
 
+// 輔助函數：填入王名並將游標移至最前面
 function quickInput(name) {
     const el = document.getElementById('cmd');
     el.value = name;
