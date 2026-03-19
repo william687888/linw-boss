@@ -3,17 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛡️ 天堂W王團秘書</title>
+    <title>🛡️ 天堂W王團秘書 - 完整功能版</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: "Microsoft JhengHei", sans-serif; padding-bottom: 50px; }
         #mainContent { display: none; }
         #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
-        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; transition: 0.1s; cursor: pointer; }
-        .card:active { transform: scale(0.96); background-color: #333; }
+        .card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px; cursor: pointer; }
         .boss-name { font-size: 1.05rem; font-weight: bold; }
         .color-default { color: #ffca2c; } 
         .color-purple { color: #bf40ff; }
@@ -24,23 +22,11 @@
         .off-day { opacity: 0.3; filter: grayscale(1); }
         @keyframes blinker { 50% { opacity: 0.7; } }
         .btn-gold { background-color: #ffca2c; color: #000; font-weight: bold; border: none; }
-        #cmd { background-color: #2a2a2a; color: #fff; border: 1px solid #ffca2c; font-weight: bold; }
+        #cmd { background-color: #2a2a2a; color: #fff; border: 1px solid #ffca2c; }
         #logArea { font-size: 0.8rem; background: #000; color: #aaa; border: 1px solid #444; border-radius: 8px; height: 150px; overflow-y: auto; padding: 10px; }
-        .log-item { border-bottom: 1px solid #222; padding-bottom: 2px; }
-        .log-user { color: #4da6ff; font-weight: bold; }
     </style>
 </head>
 <body>
-
-<script>
-    // 網域檢驗
-    (function() {
-        if (window.location.hostname !== "william687888.github.io" && window.location.hostname !== "localhost") {
-            document.body.innerHTML = "<h2 style='color:red;text-align:center;margin-top:50px;'>⚠️ 授權網域錯誤</h2>"; 
-            window.stop();
-        }
-    })();
-</script>
 
 <div id="authOverlay">
     <div class="text-center p-4">
@@ -55,12 +41,13 @@
     
     <div class="card p-3 mb-4 shadow" style="cursor: default;">
         <div class="input-group">
-            <input type="text" id="cmd" class="form-control" placeholder="輸入 [王名+時間] 例如: 巨鱷1230" onkeypress="if(event.keyCode==13) handleCommand()">
+            <input type="text" id="cmd" class="form-control" placeholder="輸入 [王名+時間]" onkeypress="if(event.keyCode==13) handleCommand()">
             <button class="btn btn-gold" onclick="handleCommand()">執行</button>
         </div>
         <div class="mt-2 text-center">
             <button class="btn btn-outline-warning btn-sm m-1" onclick="handleCommand('CD減半')">⚡ CD減半</button>
             <button class="btn btn-outline-secondary btn-sm m-1" onclick="handleCommand('CD恢復')">🔄 CD恢復</button>
+            <button class="btn btn-outline-danger btn-sm m-1" onclick="adminReset()">🧹 數據重置</button>
             <span id="syncStatus" class="badge bg-secondary ms-2">等待授權...</span>
         </div>
         <div class="mt-3">
@@ -101,29 +88,23 @@ function startCloudAuth() {
         const input = prompt("請輸入團隊通行碼：");
         if (input && input.toString() === correctCode.toString()) {
             sessionStorage.setItem('isAuthorized', 'true');
-            sessionStorage.setItem('tempAuth', input); // 暫存通行碼供寫入使用
+            sessionStorage.setItem('tempAuth', input);
             if(!myName) {
                 myName = prompt("您的代號：") || "成員";
                 localStorage.setItem('userName', myName);
             }
             unlockApp();
-        } else if (input !== null) alert("通行碼驗證失敗！");
+        } else if (input !== null) alert("驗證失敗！");
     });
 }
 
 function unlockApp() {
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
-    
     dataRef.on('value', (snap) => {
         const d = snap.val();
-        if (d) { 
-            bosses = d; render(); 
-            document.getElementById('syncStatus').innerText = "雲端同步中"; 
-            document.getElementById('syncStatus').className = "badge ms-2 bg-success"; 
-        }
+        if (d) { bosses = d; render(); document.getElementById('syncStatus').innerText = "雲端同步中"; document.getElementById('syncStatus').className = "badge ms-2 bg-success"; }
     });
-
     logRef.limitToLast(10).on('value', (snap) => {
         const area = document.getElementById('logArea');
         area.innerHTML = '';
@@ -136,17 +117,11 @@ function handleCommand(manual) {
     const input = (manual || document.getElementById('cmd').value).trim();
     document.getElementById('cmd').value = '';
     if(!input) return;
-
     let update = false, logMsg = "";
 
     if (input === "CD減半" || input === "CD恢復") {
         const isHalf = input === "CD減半";
-        bosses.forEach(b => { 
-            if(b.type==='cd'){ 
-                b.cd = isHalf ? b.origCd/2 : b.origCd; 
-                if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); 
-            }
-        });
+        bosses.forEach(b => { if(b.type==='cd'){ b.cd = isHalf ? b.origCd/2 : b.origCd; if(b.lastDeath) b.spawn = b.lastDeath + (b.cd * 3600000); }});
         update = true; logMsg = `執行了 [${input}]`;
     } else {
         let t = input.match(/\d{4}/), n = input.replace(/\d{4}/, "").trim();
@@ -162,18 +137,26 @@ function handleCommand(manual) {
     }
 
     if(update) {
-        // 同步發送當前使用的通行碼，供 Firebase Rules 校驗
         const currentCode = sessionStorage.getItem('tempAuth');
-        rootRef.update({
-            "SECRETARY_PRO_DATA": bosses,
-            "auth_code": currentCode 
-        }).then(() => {
+        rootRef.update({ "SECRETARY_PRO_DATA": bosses, "auth_code": currentCode }).then(() => {
             const now = new Date();
             const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
             logRef.push({ time: timeStr, user: myName, msg: logMsg });
-        }).catch(err => {
-            alert("⚠️ 權限不足或連線逾時，請重新整理頁面解鎖。");
-        });
+        }).catch(() => { alert("⚠️ 權限不足。"); });
+    }
+}
+
+function adminReset() {
+    if(confirm("❗確定要清空所有紀錄與日誌嗎？")) {
+        const p = prompt("請再次輸入團隊通行碼：");
+        const currentCode = sessionStorage.getItem('tempAuth');
+        if(p === currentCode) {
+            bosses.forEach(b => { if(b.type==='cd') { delete b.lastDeath; delete b.spawn; } });
+            rootRef.update({ "SECRETARY_PRO_DATA": bosses, "auth_code": currentCode, "bossLogs": null }).then(() => {
+                alert("數據已重置");
+                location.reload();
+            });
+        } else { alert("驗證不符。"); }
     }
 }
 
@@ -181,7 +164,6 @@ function render() {
     const container = document.getElementById('bossContainer');
     if(!container) return; container.innerHTML = '';
     const now = new Date(), today = now.getDay() === 0 ? 7 : now.getDay();
-    
     let sorted = bosses.map(b => {
         let sortTime = 9999999999999, isOff = false, disp = "未記錄", cdText = "下次重生：", warn = false;
         if(b.type === 'fixed') {
@@ -201,7 +183,6 @@ function render() {
         }
         return { ...b, sortTime, isOff, disp, cdText, warn };
     });
-    
     sorted.sort((a, b) => a.sortTime - b.sortTime);
     sorted.forEach(b => {
         let color = "color-default";
@@ -209,20 +190,7 @@ function render() {
         else if (b.origCd >= 12) color = "color-purple";
         else if (b.origCd >= 8) color = "color-red";
         else if (b.origCd >= 4) color = "color-blue";
-        container.innerHTML += `
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="card p-2 ${b.isOff ? 'off-day' : ''} ${b.warn ? 'warning' : ''}" onclick="document.getElementById('cmd').value='${b.name}';document.getElementById('cmd').focus();">
-                    <div class="d-flex justify-content-between">
-                        <div class="boss-name text-truncate ${color}">${b.name}</div>
-                        <span class="badge ${b.type==='fixed'?'bg-primary':'bg-secondary'}" style="font-size:0.6rem;">${b.type==='fixed'?'固定':b.cd+'h'}</span>
-                    </div>
-                    <div style="font-size:0.75rem; color:#888;">${b.alias}</div>
-                    <div class="mt-2 pt-2 border-top border-secondary">
-                        <div style="font-size:0.7rem; color:#aaa;">${b.cdText}</div>
-                        <div class="countdown">${b.disp}</div>
-                    </div>
-                </div>
-            </div>`;
+        container.innerHTML += `<div class="col-6 col-md-4 col-lg-3"><div class="card p-2 ${b.isOff ? 'off-day' : ''} ${b.warn ? 'warning' : ''}" onclick="document.getElementById('cmd').value='${b.name}';document.getElementById('cmd').focus();"><div class="d-flex justify-content-between"><div class="boss-name text-truncate ${color}">${b.name}</div><span class="badge ${b.type==='fixed'?'bg-primary':'bg-secondary'}" style="font-size:0.6rem;">${b.type==='fixed'?'固定':b.cd+'h'}</span></div><div style="font-size:0.75rem; color:#888;">${b.alias}</div><div class="mt-2 pt-2 border-top border-secondary"><div style="font-size:0.7rem; color:#aaa;">${b.cdText}</div><div class="countdown">${b.disp}</div></div></div></div>`;
     });
 }
 setInterval(render, 30000); 
